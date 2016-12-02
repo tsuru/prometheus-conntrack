@@ -4,3 +4,6 @@
 
 build:
 	go build -o bin/prometheus-conntrack
+
+test:
+	go test ./...
