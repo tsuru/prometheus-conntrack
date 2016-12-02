@@ -16,23 +16,29 @@ type conn struct {
 	DestinationIP   string
 	SourcePort      string
 	DestinationPort string
+	State           string
+	Protocol        string
 }
 
 type conntrackResult struct {
 	Items []struct {
 		Metas []struct {
-			Direction  string `xml:"direction,attr"`
-			SourceIP   string `xml:"layer3>src"`
-			DestIP     string `xml:"layer3>dst"`
-			SourcePort string `xml:"layer4>sport"`
-			DestPort   string `xml:"layer4>dport"`
+			Direction string `xml:"direction,attr"`
+			SourceIP  string `xml:"layer3>src"`
+			DestIP    string `xml:"layer3>dst"`
+			State     string `xml:"state"`
+			Layer4    struct {
+				SourcePort string `xml:"sport"`
+				DestPort   string `xml:"dport"`
+				Protocol   string `xml:"protoname,attr"`
+			} `xml:"layer4"`
 		} `xml:"meta"`
 	} `xml:"flow"`
 }
 
 func conntrack() ([]conn, error) {
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("conntrack", "-p", "tcp", "-L", "--state", "ESTABLISHED", "-o", "xml")
+	cmd := exec.Command("conntrack", "-L", "-o", "xml")
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -50,9 +56,11 @@ func conntrack() ([]conn, error) {
 			if item.Metas[0].SourceIP != "127.0.0.1" && item.Metas[0].DestIP != "127.0.0.1" {
 				conns = append(conns, conn{
 					SourceIP:        item.Metas[0].SourceIP,
-					SourcePort:      item.Metas[0].SourcePort,
+					SourcePort:      item.Metas[0].Layer4.SourcePort,
 					DestinationIP:   item.Metas[0].DestIP,
-					DestinationPort: item.Metas[0].DestPort,
+					DestinationPort: item.Metas[0].Layer4.DestPort,
+					State:           item.Metas[2].State,
+					Protocol:        item.Metas[0].Layer4.Protocol,
 				})
 			}
 		}

@@ -8,7 +8,10 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -18,61 +21,83 @@ func main() {
 	endpoint := flag.String("docker-endpoint", "unix:///var/run/docker.sock", "The address to the docker api.")
 	flag.Parse()
 	http.Handle("/metrics", promhttp.Handler())
-	conns := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "container_outbound_connections",
-		Help: "Number of outbound connections by container and destination",
-	},
-		[]string{
-			"id",
-			"container_label_tsuru_app_name",
-			"container_label_tsuru_process_name",
-			"dst",
-		},
-	)
-	prometheus.MustRegister(conns)
-	go run(*endpoint, conns)
+	collector := &ConntrackCollector{
+		dockerEndpoint: *endpoint,
+		conntrack:      conntrack,
+	}
+	prometheus.MustRegister(collector)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
 
-func run(endpoint string, connsGauge *prometheus.GaugeVec) {
-	for {
-		containers, err := listContainers(endpoint)
+type ConntrackCollector struct {
+	dockerEndpoint string
+	conntrack      func() ([]conn, error)
+}
+
+func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", []string{"id", "name"}, nil)
+}
+
+func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
+	containers, err := listContainers(c.dockerEndpoint)
+	if err != nil {
+		log.Print(err)
+	}
+	conns, err := c.conntrack()
+	if err != nil {
+		log.Print(err)
+	}
+	for _, container := range containers {
+		if container.State != "" && container.State != "running" {
+			continue
+		}
+		count := make(map[string]int)
+		cont, err := inspect(container.ID, c.dockerEndpoint)
 		if err != nil {
 			log.Print(err)
 		}
-		conns, err := conntrack()
-		if err != nil {
-			log.Print(err)
+		for _, conn := range conns {
+			value := ""
+			switch cont.NetworkSettings.IPAddress {
+			case conn.SourceIP:
+				value = conn.DestinationIP + ":" + conn.DestinationPort
+			case conn.DestinationIP:
+				value = conn.SourceIP + ":" + conn.SourcePort
+			}
+			if value != "" {
+				key := conn.State + "-" + conn.Protocol + "-" + value
+				count[key] = count[key] + 1
+			}
 		}
-		for _, c := range containers {
-			if c.State != "" && c.State != "running" {
-				continue
-			}
-			count := make(map[string]int)
-			cont, err := inspect(c.ID, endpoint)
-			if err != nil {
-				log.Print(err)
-			}
-			for _, conn := range conns {
-				value := ""
-				switch cont.NetworkSettings.IPAddress {
-				case conn.SourceIP:
-					value = conn.DestinationIP + ":" + conn.DestinationPort
-				case conn.DestinationIP:
-					value = conn.SourceIP + ":" + conn.SourcePort
-				}
-				if value != "" {
-					count[value] = count[value] + 1
-				}
-			}
-			for k, v := range count {
-				connsGauge.With(prometheus.Labels{
-					"id": cont.ID,
-					"container_label_tsuru_app_name":     cont.Config.Labels["container_label_tsuru_app_name"],
-					"container_label_tsuru_process_name": cont.Config.Labels["container_label_tsuru_process_name"],
-					"dst": k,
-				}).Set(float64(v))
-			}
+		labels, values := []string{}, []string{}
+		for k, v := range containerLabels(cont) {
+			labels = append(labels, sanitizeLabelName(k))
+			values = append(values, v)
+		}
+		labels = append(labels, "state", "protocol", "destination")
+		for k, v := range count {
+			keys := strings.SplitN(k, "-", 3)
+			finalValues := append(values, keys...)
+			desc := prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", labels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(v), finalValues...)
 		}
 	}
+}
+
+func containerLabels(container *docker.Container) map[string]string {
+	labels := map[string]string{
+		"id":    container.ID,
+		"name":  container.Name,
+		"image": container.Config.Image,
+	}
+	for k, v := range container.Config.Labels {
+		labels["container_label_"+k] = v
+	}
+	return labels
+}
+
+var invalidLabelCharRE = regexp.MustCompile(`[^a-zA-Z0-9_]`)
+
+func sanitizeLabelName(name string) string {
+	return invalidLabelCharRE.ReplaceAllString(name, "_")
 }
