@@ -3,7 +3,7 @@
 # license that can be found in the LICENSE file.
 
 build:
-	go build -o bin/prometheus-conntrack
+	go build -ldflags "-linkmode external -extldflags -static" -o bin/prometheus-conntrack
 
 test:
 	go test ./...
