@@ -1,6 +1,8 @@
 Prometheus Conntrack Metrics
 ============================
 
+[![Build Status](https://travis-ci.org/tsuru/prometheus-conntrack.png?branch=master)](https://travis-ci.org/tsuru/prometheus-conntrack)
+
 `prometheus-conntrack` exposes [conntrack](http://conntrack-tools.netfilter.org/) metrics for docker containers.
 
 For example, the series `container_connections{container_label_label1="val1",destination="192.168.50.4:2375",id="id",image="image",name="my-container",protocol="tcp",state="ESTABLISHED"} 2` means that the container "my-container" has two connections established with tcp://192.168.50.4:2375.
