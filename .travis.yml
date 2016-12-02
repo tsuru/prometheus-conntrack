@@ -1,0 +1,21 @@
+language: go
+sudo: required
+install: true
+go:
+  - 1.7.3
+  - tip
+script:
+  - make test
+  - make build
+env:
+  global:
+    - GOARCH=amd64
+    - GO_FOR_RELEASE=1.7.3
+    - IMAGE_NAME=tsuru/prometheus-conntrack
+services:
+  - docker
+after_success:
+  - curl https://raw.githubusercontent.com/tsuru/push-to-docker/master/push.sh | bash
+matrix:
+  allow_failures:
+    - go: tip
