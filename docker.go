@@ -6,15 +6,7 @@ package main
 
 import docker "github.com/fsouza/go-dockerclient"
 
-func inspect(contID, endpoint string) (*docker.Container, error) {
-	client, err := docker.NewClient(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	return client.InspectContainer(contID)
-}
-
-func listContainers(endpoint string) ([]docker.APIContainers, error) {
+func listContainers(endpoint string) ([]*docker.Container, error) {
 	client, err := docker.NewClient(endpoint)
 	if err != nil {
 		return nil, err
@@ -23,5 +15,16 @@ func listContainers(endpoint string) ([]docker.APIContainers, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp, nil
+	var containers []*docker.Container
+	for _, c := range resp {
+		if c.State != "" && c.State != "running" {
+			continue
+		}
+		container, err := client.InspectContainer(c.ID)
+		if err != nil {
+			return nil, err
+		}
+		containers = append(containers, container)
+	}
+	return containers, nil
 }

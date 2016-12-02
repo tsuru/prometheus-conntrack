@@ -28,16 +28,6 @@ func createContainer(c *check.C, url, name string) string {
 	return cont.ID
 }
 
-func (s *S) TestInspect(c *check.C) {
-	dockerServer, err := testing.NewServer("127.0.0.1:0", nil, nil)
-	c.Assert(err, check.IsNil)
-	defer dockerServer.Stop()
-	id := createContainer(c, dockerServer.URL(), "my-container")
-	cont, err := inspect(id, dockerServer.URL())
-	c.Assert(err, check.IsNil)
-	c.Assert(cont.ID, check.Equals, id)
-}
-
 func (s *S) TestListContainers(c *check.C) {
 	dockerServer, err := testing.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)

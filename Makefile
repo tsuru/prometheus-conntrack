@@ -7,3 +7,6 @@ build:
 
 test:
 	go test ./...
+
+run: build
+	./bin/prometheus-conntrack
