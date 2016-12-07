@@ -17,7 +17,7 @@ func listContainers(endpoint string) ([]*docker.Container, error) {
 	}
 	var containers []*docker.Container
 	for _, c := range resp {
-		if c.State != "" && c.State != "running" {
+		if c.State != "running" {
 			continue
 		}
 		container, err := client.InspectContainer(c.ID)
