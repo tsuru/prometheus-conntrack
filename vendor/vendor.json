@@ -171,17 +171,16 @@
 			"revisionTime": "2016-10-20T17:32:27-04:00"
 		},
 		{
-			"checksumSHA1": "kLTUIiLtAwXwqZ7f8AVxsdsPaXQ=",
-			"origin": "github.com/tsuru/prometheus-conntrack/vendor/github.com/fsouza/go-dockerclient",
+			"checksumSHA1": "hkqmhIE6SrFrv5L9xlKmXHgMxL0=",
 			"path": "github.com/fsouza/go-dockerclient",
-			"revision": "5cfde1d138cd2cdc13e4aa36af631beb19dcbe9c",
-			"revisionTime": "2016-11-01T20:40:33-04:00"
+			"revision": "4611598e6e6615762544f0805acd59dfede5c9a2",
+			"revisionTime": "2016-12-06T00:43:20Z"
 		},
 		{
-			"checksumSHA1": "Do7K+1ZZwwMedwsWDDjLH4/Oqkc=",
+			"checksumSHA1": "LhnXeGwR+6to5flvZBhKqNPop14=",
 			"path": "github.com/fsouza/go-dockerclient/testing",
-			"revision": "5cfde1d138cd2cdc13e4aa36af631beb19dcbe9c",
-			"revisionTime": "2016-11-01T20:40:33-04:00"
+			"revision": "4611598e6e6615762544f0805acd59dfede5c9a2",
+			"revisionTime": "2016-12-06T00:43:20Z"
 		},
 		{
 			"checksumSHA1": "kBeNcaKk56FguvPSUCEaH6AxpRc=",
