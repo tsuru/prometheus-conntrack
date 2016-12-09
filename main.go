@@ -24,7 +24,9 @@ func main() {
 		containerLister: func() ([]*docker.Container, error) {
 			return listContainers(*endpoint)
 		},
-		conntrack: conntrack,
+		conntrack:  conntrack,
+		connCount:  make(map[string]map[string]int),
+		containers: make(map[string]*docker.Container),
 	}
 	prometheus.MustRegister(collector)
 	log.Printf("HTTP server listening at %s...\n", *addr)

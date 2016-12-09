@@ -15,7 +15,32 @@ import (
 	check "gopkg.in/check.v1"
 )
 
+type fakeConntrack struct {
+	calls int
+	conns [][]conn
+}
+
+func (f *fakeConntrack) conntrack() ([]conn, error) {
+	f.calls = f.calls + 1
+	return f.conns[f.calls-1], nil
+}
+
 func (*S) TestCollector(c *check.C) {
+	conntrack := &fakeConntrack{
+		conns: [][]conn{
+			{
+				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.5", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+			},
+			{
+				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+			},
+			{
+				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+			},
+		},
+	}
 	collector := &ConntrackCollector{
 		containerLister: func() ([]*docker.Container, error) {
 			return []*docker.Container{{
@@ -25,13 +50,9 @@ func (*S) TestCollector(c *check.C) {
 				NetworkSettings: &docker.NetworkSettings{IPAddress: "10.10.1.2"},
 			}}, nil
 		},
-		conntrack: func() ([]conn, error) {
-			return []conn{
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.5", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-			}, nil
-		},
+		conntrack:  conntrack.conntrack,
+		connCount:  make(map[string]map[string]int),
+		containers: make(map[string]*docker.Container),
 	}
 	prometheus.MustRegister(collector)
 	rr := httptest.NewRecorder()
@@ -42,4 +63,22 @@ func (*S) TestCollector(c *check.C) {
 	lines := strings.Split(rr.Body.String(), "\n")
 	c.Assert(lines[2], check.Equals, `container_connections{container_label_label1="val1",destination="192.168.50.4:2375",id="id",image="image",name="name",protocol="tcp",state="ESTABLISHED"} 2`)
 	c.Assert(lines[3], check.Equals, `container_connections{container_label_label1="val1",destination="192.168.50.5:2376",id="id",image="image",name="name",protocol="tcp",state="ESTABLISHED"} 1`)
+
+	req, err = http.NewRequest("GET", "/metrics", nil)
+	c.Assert(err, check.IsNil)
+	rr = httptest.NewRecorder()
+	promhttp.Handler().ServeHTTP(rr, req)
+	c.Assert(rr.Code, check.Equals, http.StatusOK)
+	lines = strings.Split(rr.Body.String(), "\n")
+	c.Assert(lines[2], check.Equals, `container_connections{container_label_label1="val1",destination="192.168.50.4:2375",id="id",image="image",name="name",protocol="tcp",state="ESTABLISHED"} 1`)
+	c.Assert(lines[3], check.Equals, `container_connections{container_label_label1="val1",destination="192.168.50.5:2376",id="id",image="image",name="name",protocol="tcp",state="ESTABLISHED"} 0`)
+
+	req, err = http.NewRequest("GET", "/metrics", nil)
+	c.Assert(err, check.IsNil)
+	rr = httptest.NewRecorder()
+	promhttp.Handler().ServeHTTP(rr, req)
+	c.Assert(rr.Code, check.Equals, http.StatusOK)
+	lines = strings.Split(rr.Body.String(), "\n")
+	c.Assert(lines[2], check.Equals, `container_connections{container_label_label1="val1",destination="192.168.50.4:2375",id="id",image="image",name="name",protocol="tcp",state="ESTABLISHED"} 1`)
+	c.Assert(lines[3], check.Not(check.Equals), `container_connections{container_label_label1="val1",destination="192.168.50.5:2376",id="id",image="image",name="name",protocol="tcp",state="ESTABLISHED"} 0`)
 }
