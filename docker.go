@@ -11,16 +11,17 @@ func listContainers(endpoint string) ([]*docker.Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.ListContainers(docker.ListContainersOptions{})
+	resp, err := client.ListContainers(docker.ListContainersOptions{
+		Filters: map[string][]string{
+			"status": {"running"},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
 	containers := make([]*docker.Container, len(resp))
 	i := 0
 	for _, c := range resp {
-		if c.State != "running" {
-			continue
-		}
 		container, err := client.InspectContainer(c.ID)
 		if err != nil {
 			return nil, err
