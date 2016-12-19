@@ -59,7 +59,6 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			currContainers[container.ID] = *container
 		}
 	}
-	log.Print(counts)
 	c.setState(counts, currContainers)
 	sendMetrics(counts, currContainers, ch)
 }
