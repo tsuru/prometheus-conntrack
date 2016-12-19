@@ -13,7 +13,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var additionalLabels = []string{"state", "protocol", "destination"}
+var (
+	additionalLabels = []string{"state", "protocol", "destination"}
+	desc             = prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", []string{"id", "name"}, nil)
+)
 
 type ConntrackCollector struct {
 	containerLister func() ([]*docker.Container, error)
@@ -24,7 +27,7 @@ type ConntrackCollector struct {
 }
 
 func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", []string{"id", "name"}, nil)
+	ch <- desc
 }
 
 func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
