@@ -6,7 +6,6 @@ package main
 
 import (
 	"log"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -136,8 +135,6 @@ func containerLabels(container *docker.Container) map[string]string {
 	return labels
 }
 
-var invalidLabelCharRE = regexp.MustCompile(`[^a-zA-Z0-9_]`)
-
 func sanitizeLabelName(name string) string {
-	return invalidLabelCharRE.ReplaceAllString(name, "_")
+	return strings.Replace(name, ".", "_", -1)
 }
