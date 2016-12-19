@@ -18,7 +18,7 @@ var additionalLabels = []string{"state", "protocol", "destination"}
 
 type ConntrackCollector struct {
 	containerLister func() ([]*docker.Container, error)
-	conntrack       func() ([]conn, error)
+	conntrack       func() ([]*conn, error)
 	sync.Mutex
 	connCount  map[string]map[string]int
 	containers map[string]*docker.Container
@@ -56,19 +56,19 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 				}
 				counts[container.ID][key] = counts[container.ID][key] + 1
 			}
-			currContainers[container.ID] = *container
+			currContainers[container.ID] = container
 		}
 	}
 	c.setState(counts, currContainers)
 	sendMetrics(counts, currContainers, ch)
 }
 
-func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]docker.Container) {
+func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]*docker.Container) {
 	c.Lock()
 	defer c.Unlock()
-	copyCont := make(map[string]docker.Container)
-	for _, cont := range c.containers {
-		copyCont[cont.ID] = *cont
+	copyCont := make(map[string]*docker.Container)
+	for i, cont := range c.containers {
+		copyCont[cont.ID] = c.containers[i]
 	}
 	copy := make(map[string]map[string]int)
 	for k, v := range c.connCount {
@@ -88,16 +88,16 @@ func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]d
 	return copy, copyCont
 }
 
-func (c *ConntrackCollector) setState(count map[string]map[string]int, containers map[string]docker.Container) {
+func (c *ConntrackCollector) setState(count map[string]map[string]int, containers map[string]*docker.Container) {
 	c.Lock()
 	defer c.Unlock()
 	c.connCount = count
 	for k, v := range containers {
-		c.containers[k] = &v
+		c.containers[k] = v
 	}
 }
 
-func sendMetrics(metrics map[string]map[string]int, containers map[string]docker.Container, ch chan<- prometheus.Metric) {
+func sendMetrics(metrics map[string]map[string]int, containers map[string]*docker.Container, ch chan<- prometheus.Metric) {
 	for contID, count := range metrics {
 		labelsMap := containerLabels(containers[contID])
 		labels := make([]string, len(labelsMap)+len(additionalLabels))
@@ -124,7 +124,7 @@ func sendMetrics(metrics map[string]map[string]int, containers map[string]docker
 	}
 }
 
-func containerLabels(container docker.Container) map[string]string {
+func containerLabels(container *docker.Container) map[string]string {
 	labels := map[string]string{
 		"id":    container.ID,
 		"name":  container.Name,

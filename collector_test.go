@@ -17,17 +17,17 @@ import (
 
 type fakeConntrack struct {
 	calls int
-	conns [][]conn
+	conns [][]*conn
 }
 
-func (f *fakeConntrack) conntrack() ([]conn, error) {
+func (f *fakeConntrack) conntrack() ([]*conn, error) {
 	f.calls = f.calls + 1
 	return f.conns[f.calls-1], nil
 }
 
 func (*S) TestCollector(c *check.C) {
 	conntrack := &fakeConntrack{
-		conns: [][]conn{
+		conns: [][]*conn{
 			{
 				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
@@ -98,7 +98,7 @@ func (s *S) BenchmarkCollector(c *check.C) {
 			NetworkSettings: &docker.NetworkSettings{IPAddress: "10.10.1.3"},
 		},
 	}
-	conns := []conn{
+	conns := []*conn{
 		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "10.10.1.3", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.6", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
@@ -116,7 +116,7 @@ func (s *S) BenchmarkCollector(c *check.C) {
 		containerLister: func() ([]*docker.Container, error) {
 			return containers, nil
 		},
-		conntrack: func() ([]conn, error) {
+		conntrack: func() ([]*conn, error) {
 			return conns, nil
 		},
 		connCount:  make(map[string]map[string]int),

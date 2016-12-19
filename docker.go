@@ -20,14 +20,12 @@ func listContainers(endpoint string) ([]*docker.Container, error) {
 		return nil, err
 	}
 	containers := make([]*docker.Container, len(resp))
-	i := 0
-	for _, c := range resp {
+	for i, c := range resp {
 		container, err := client.InspectContainer(c.ID)
 		if err != nil {
 			return nil, err
 		}
 		containers[i] = container
-		i++
 	}
-	return containers[:i], nil
+	return containers, nil
 }

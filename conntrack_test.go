@@ -25,7 +25,7 @@ func (*S) TestConntrack(c *check.C) {
 	defer commandmocker.Remove(dir)
 	conns, err := conntrack()
 	c.Assert(err, check.IsNil)
-	expected := []conn{
+	expected := []*conn{
 		{SourceIP: "192.168.50.4", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "172.17.42.1", SourcePort: "42418", DestinationIP: "172.17.0.2", DestinationPort: "4001", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "172.17.42.1", SourcePort: "42428", DestinationIP: "172.17.0.2", DestinationPort: "4001", State: "ESTABLISHED", Protocol: "tcp"},
