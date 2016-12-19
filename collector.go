@@ -14,6 +14,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var additionalLabels = []string{"state", "protocol", "destination"}
+
 type ConntrackCollector struct {
 	containerLister func() ([]*docker.Container, error)
 	conntrack       func() ([]conn, error)
@@ -31,10 +33,12 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 	containers, err := c.containerLister()
 	if err != nil {
 		log.Print(err)
+		return
 	}
 	conns, err := c.conntrack()
 	if err != nil {
 		log.Print(err)
+		return
 	}
 	for _, container := range containers {
 		for _, conn := range conns {
@@ -95,17 +99,27 @@ func (c *ConntrackCollector) setState(count map[string]map[string]int, container
 
 func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, ch chan<- prometheus.Metric) {
 	for contID, count := range metrics {
-		labels, values := []string{}, []string{}
-		for k, v := range containerLabels(c.containers[contID]) {
-			labels = append(labels, sanitizeLabelName(k))
-			values = append(values, v)
+		labelsMap := containerLabels(c.containers[contID])
+		labels := make([]string, len(labelsMap)+len(additionalLabels))
+		values := make([]string, len(labelsMap)+len(additionalLabels))
+		i := 0
+		for k, v := range labelsMap {
+			labels[i] = k
+			values[i] = v
+			i++
 		}
-		labels = append(labels, "state", "protocol", "destination")
+		for _, l := range additionalLabels {
+			labels[i] = l
+			i++
+		}
+		i = i - len(additionalLabels)
+		desc := prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", labels, nil)
 		for k, v := range count {
 			keys := strings.SplitN(k, "-", 3)
-			finalValues := append(values, keys...)
-			desc := prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", labels, nil)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(v), finalValues...)
+			values[i] = keys[0]
+			values[i+1] = keys[1]
+			values[i+2] = keys[2]
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(v), values...)
 		}
 	}
 }

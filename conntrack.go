@@ -50,20 +50,22 @@ func conntrack() ([]conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	var conns []conn
+	conns := make([]conn, len(result.Items))
+	i := 0
 	for _, item := range result.Items {
 		if len(item.Metas) > 0 {
 			if item.Metas[0].SourceIP != "127.0.0.1" && item.Metas[0].DestIP != "127.0.0.1" {
-				conns = append(conns, conn{
+				conns[i] = conn{
 					SourceIP:        item.Metas[0].SourceIP,
 					SourcePort:      item.Metas[0].Layer4.SourcePort,
 					DestinationIP:   item.Metas[0].DestIP,
 					DestinationPort: item.Metas[0].Layer4.DestPort,
 					State:           item.Metas[2].State,
 					Protocol:        item.Metas[0].Layer4.Protocol,
-				})
+				}
+				i++
 			}
 		}
 	}
-	return conns, nil
+	return conns[:i], nil
 }

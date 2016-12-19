@@ -10,3 +10,6 @@ test:
 
 run: build
 	./bin/prometheus-conntrack
+
+bench:
+	go test -check.b -check.bmem

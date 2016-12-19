@@ -15,7 +15,8 @@ func listContainers(endpoint string) ([]*docker.Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	var containers []*docker.Container
+	containers := make([]*docker.Container, len(resp))
+	i := 0
 	for _, c := range resp {
 		if c.State != "running" {
 			continue
@@ -24,7 +25,8 @@ func listContainers(endpoint string) ([]*docker.Container, error) {
 		if err != nil {
 			return nil, err
 		}
-		containers = append(containers, container)
+		containers[i] = container
+		i++
 	}
-	return containers, nil
+	return containers[:i], nil
 }
