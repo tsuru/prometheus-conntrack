@@ -59,8 +59,9 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			currContainers[container.ID] = *container
 		}
 	}
+	log.Print(counts)
 	c.setState(counts, currContainers)
-	c.sendMetrics(counts, ch)
+	sendMetrics(counts, currContainers, ch)
 }
 
 func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]docker.Container) {
@@ -97,14 +98,14 @@ func (c *ConntrackCollector) setState(count map[string]map[string]int, container
 	}
 }
 
-func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, ch chan<- prometheus.Metric) {
+func sendMetrics(metrics map[string]map[string]int, containers map[string]docker.Container, ch chan<- prometheus.Metric) {
 	for contID, count := range metrics {
-		labelsMap := containerLabels(c.containers[contID])
+		labelsMap := containerLabels(containers[contID])
 		labels := make([]string, len(labelsMap)+len(additionalLabels))
 		values := make([]string, len(labelsMap)+len(additionalLabels))
 		i := 0
 		for k, v := range labelsMap {
-			labels[i] = k
+			labels[i] = sanitizeLabelName(k)
 			values[i] = v
 			i++
 		}
@@ -124,7 +125,7 @@ func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, ch c
 	}
 }
 
-func containerLabels(container *docker.Container) map[string]string {
+func containerLabels(container docker.Container) map[string]string {
 	labels := map[string]string{
 		"id":    container.ID,
 		"name":  container.Name,
