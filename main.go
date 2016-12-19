@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 
+	_ "net/http/pprof"
+
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
