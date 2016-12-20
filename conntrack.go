@@ -23,11 +23,10 @@ type conn struct {
 type conntrackResult struct {
 	Items []struct {
 		Metas []struct {
-			Direction string `xml:"direction,attr"`
-			SourceIP  string `xml:"layer3>src"`
-			DestIP    string `xml:"layer3>dst"`
-			State     string `xml:"state"`
-			Layer4    struct {
+			SourceIP string `xml:"layer3>src"`
+			DestIP   string `xml:"layer3>dst"`
+			State    string `xml:"state"`
+			Layer4   struct {
 				SourcePort string `xml:"sport"`
 				DestPort   string `xml:"dport"`
 				Protocol   string `xml:"protoname,attr"`
@@ -36,9 +35,12 @@ type conntrackResult struct {
 	} `xml:"flow"`
 }
 
-func conntrack() ([]*conn, error) {
+func conntrack(protocols string) ([]*conn, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command("conntrack", "-L", "-o", "xml")
+	if protocols != "" {
+		cmd.Args = append(cmd.Args, "-p", protocols)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -50,22 +52,20 @@ func conntrack() ([]*conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conns := make([]*conn, len(result.Items))
-	i := 0
+	var conns []*conn
 	for _, item := range result.Items {
 		if len(item.Metas) > 0 {
 			if item.Metas[0].SourceIP != "127.0.0.1" && item.Metas[0].DestIP != "127.0.0.1" {
-				conns[i] = &conn{
+				conns = append(conns, &conn{
 					SourceIP:        item.Metas[0].SourceIP,
 					SourcePort:      item.Metas[0].Layer4.SourcePort,
 					DestinationIP:   item.Metas[0].DestIP,
 					DestinationPort: item.Metas[0].Layer4.DestPort,
 					State:           item.Metas[2].State,
 					Protocol:        item.Metas[0].Layer4.Protocol,
-				}
-				i++
+				})
 			}
 		}
 	}
-	return conns[:i], nil
+	return conns, nil
 }

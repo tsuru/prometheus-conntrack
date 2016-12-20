@@ -23,7 +23,7 @@ func (*S) TestConntrack(c *check.C) {
 	dir, err := commandmocker.Add("conntrack", conntrackXML)
 	c.Assert(err, check.IsNil)
 	defer commandmocker.Remove(dir)
-	conns, err := conntrack()
+	conns, err := conntrack("")
 	c.Assert(err, check.IsNil)
 	expected := []*conn{
 		{SourceIP: "192.168.50.4", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
@@ -39,13 +39,23 @@ func (*S) TestConntrack(c *check.C) {
 		{SourceIP: "10.211.55.2", SourcePort: "51370", DestinationIP: "10.211.55.184", DestinationPort: "22", State: "ESTABLISHED", Protocol: "tcp"},
 	}
 	c.Assert(conns, check.DeepEquals, expected)
+	c.Assert(commandmocker.Parameters(dir), check.DeepEquals, []string{"-L", "-o", "xml"})
+}
+
+func (*S) TestConntrackFilterProtocols(c *check.C) {
+	dir, err := commandmocker.Add("conntrack", conntrackXML)
+	c.Assert(err, check.IsNil)
+	defer commandmocker.Remove(dir)
+	_, err = conntrack("tcp")
+	c.Assert(err, check.IsNil)
+	c.Assert(commandmocker.Parameters(dir), check.DeepEquals, []string{"-L", "-o", "xml", "-p", "tcp"})
 }
 
 func (*S) TestConntrackCommandFailure(c *check.C) {
 	dir, err := commandmocker.Error("conntrack", "something went wrong", 120)
 	c.Assert(err, check.IsNil)
 	defer commandmocker.Remove(dir)
-	conns, err := conntrack()
+	conns, err := conntrack("")
 	c.Assert(err, check.ErrorMatches, "conntrack failed: exit status 120. Output: something went wrong")
 	c.Assert(conns, check.IsNil)
 }
