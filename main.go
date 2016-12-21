@@ -19,7 +19,7 @@ import (
 func main() {
 	addr := flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 	endpoint := flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Docker endpoint.")
-	protocols := flag.String("protocols", "", "Comma separated list of protocols to filter.")
+	protocol := flag.String("protocol", "", "Protocol to track connections. Defaults to all.")
 	flag.Parse()
 	http.Handle("/metrics", promhttp.Handler())
 	log.Printf("Fetching containers from %s...\n", *endpoint)
@@ -28,7 +28,7 @@ func main() {
 			return listContainers(*endpoint)
 		},
 		conntrack: func() ([]*conn, error) {
-			return conntrack(*protocols)
+			return conntrack(*protocol)
 		},
 		connCount:  make(map[string]map[string]int),
 		containers: make(map[string]*docker.Container),

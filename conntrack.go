@@ -35,11 +35,11 @@ type conntrackResult struct {
 	} `xml:"flow"`
 }
 
-func conntrack(protocols string) ([]*conn, error) {
+func conntrack(protocol string) ([]*conn, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command("conntrack", "-L", "-o", "xml")
-	if protocols != "" {
-		cmd.Args = append(cmd.Args, "-p", protocols)
+	if protocol != "" {
+		cmd.Args = append(cmd.Args, "-p", protocol)
 	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
