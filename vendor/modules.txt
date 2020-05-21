@@ -1,0 +1,98 @@
+# github.com/Azure/go-ansiterm v0.0.0-20160622173216-fa152c58bc15
+## explicit
+github.com/Azure/go-ansiterm
+github.com/Azure/go-ansiterm/winterm
+# github.com/Microsoft/go-winio v0.4.14
+## explicit
+github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/pkg/guid
+# github.com/Sirupsen/logrus v0.10.1-0.20160829202321-3ec0642a7fb6
+## explicit
+github.com/Sirupsen/logrus
+# github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a
+## explicit
+github.com/beorn7/perks/quantile
+# github.com/docker/docker v1.4.2-0.20161201193230-0020398c74e8
+## explicit
+github.com/docker/docker/api/types
+github.com/docker/docker/api/types/blkiodev
+github.com/docker/docker/api/types/container
+github.com/docker/docker/api/types/filters
+github.com/docker/docker/api/types/mount
+github.com/docker/docker/api/types/network
+github.com/docker/docker/api/types/registry
+github.com/docker/docker/api/types/strslice
+github.com/docker/docker/api/types/swarm
+github.com/docker/docker/api/types/versions
+github.com/docker/docker/opts
+github.com/docker/docker/pkg/archive
+github.com/docker/docker/pkg/fileutils
+github.com/docker/docker/pkg/homedir
+github.com/docker/docker/pkg/idtools
+github.com/docker/docker/pkg/ioutils
+github.com/docker/docker/pkg/jsonlog
+github.com/docker/docker/pkg/jsonmessage
+github.com/docker/docker/pkg/longpath
+github.com/docker/docker/pkg/pools
+github.com/docker/docker/pkg/promise
+github.com/docker/docker/pkg/stdcopy
+github.com/docker/docker/pkg/system
+github.com/docker/docker/pkg/term
+github.com/docker/docker/pkg/term/windows
+# github.com/docker/go-connections v0.2.2-0.20161115161849-4ccf312bf1d3
+## explicit
+github.com/docker/go-connections/nat
+# github.com/docker/go-units v0.3.2-0.20161020213227-8a7beacffa30
+## explicit
+github.com/docker/go-units
+# github.com/fsouza/go-dockerclient v0.0.0-20161206004320-4611598e6e66
+## explicit
+github.com/fsouza/go-dockerclient
+github.com/fsouza/go-dockerclient/testing
+# github.com/golang/protobuf v0.0.0-20161117033126-8ee79997227b
+## explicit
+github.com/golang/protobuf/proto
+# github.com/gorilla/context v0.0.0-20160525203319-aed02d124ae4
+## explicit
+github.com/gorilla/context
+# github.com/gorilla/mux v0.0.0-20160920230813-757bef944d0f
+## explicit
+github.com/gorilla/mux
+# github.com/hashicorp/go-cleanhttp v0.0.0-20160407174126-ad28ea4487f0
+## explicit
+github.com/hashicorp/go-cleanhttp
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
+## explicit
+github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/opencontainers/runc v1.0.0-rc2.0.20161027022316-e7abf30cb820
+## explicit
+github.com/opencontainers/runc/libcontainer/system
+github.com/opencontainers/runc/libcontainer/user
+# github.com/prometheus/client_golang v0.8.1-0.20161124155732-575f371f7862
+## explicit
+github.com/prometheus/client_golang/prometheus
+github.com/prometheus/client_golang/prometheus/promhttp
+# github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335
+## explicit
+github.com/prometheus/client_model/go
+# github.com/prometheus/common v0.0.0-20161201123508-195bde7883f7
+## explicit
+github.com/prometheus/common/expfmt
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/prometheus/common/model
+# github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9
+## explicit
+github.com/prometheus/procfs
+# github.com/tsuru/commandmocker v0.0.0-20160909010208-e1d28f4f616a
+## explicit
+github.com/tsuru/commandmocker
+# golang.org/x/net v0.0.0-20161027173718-b626cca987fa
+## explicit
+golang.org/x/net/context
+golang.org/x/net/context/ctxhttp
+# golang.org/x/sys v0.0.0-20190507160741-ecd444e8653b
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2
+## explicit
+gopkg.in/check.v1
