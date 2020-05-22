@@ -11,9 +11,9 @@ import (
 
 	_ "net/http/pprof"
 
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/tsuru/prometheus-conntrack/collector"
 )
 
 func main() {
@@ -23,16 +23,10 @@ func main() {
 	flag.Parse()
 	http.Handle("/metrics", promhttp.Handler())
 	log.Printf("Fetching containers from %s...\n", *endpoint)
-	collector := &ConntrackCollector{
-		containerLister: func() ([]*docker.Container, error) {
-			return listContainers(*endpoint)
-		},
-		conntrack: func() ([]*conn, error) {
-			return conntrack(*protocol)
-		},
-		connCount:  make(map[string]map[string]int),
-		containers: make(map[string]*docker.Container),
-	}
+	collector := collector.New(
+		collector.NewDockerContainerLister(*endpoint),
+		collector.NewConntrack(*protocol),
+	)
 	prometheus.MustRegister(collector)
 	log.Printf("HTTP server listening at %s...\n", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))

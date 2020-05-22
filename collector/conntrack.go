@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package collector
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"os/exec"
 )
 
-type conn struct {
+type Conn struct {
 	SourceIP        string
 	DestinationIP   string
 	SourcePort      string
@@ -35,7 +35,7 @@ type conntrackResult struct {
 	} `xml:"flow"`
 }
 
-func conntrack(protocol string) ([]*conn, error) {
+func conntrack(protocol string) ([]*Conn, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command("conntrack", "-L", "-o", "xml")
 	if protocol != "" {
@@ -52,11 +52,11 @@ func conntrack(protocol string) ([]*conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	var conns []*conn
+	var conns []*Conn
 	for _, item := range result.Items {
 		if len(item.Metas) > 0 {
 			if item.Metas[0].SourceIP != "127.0.0.1" && item.Metas[0].DestIP != "127.0.0.1" {
-				conns = append(conns, &conn{
+				conns = append(conns, &Conn{
 					SourceIP:        item.Metas[0].SourceIP,
 					SourcePort:      item.Metas[0].Layer4.SourcePort,
 					DestinationIP:   item.Metas[0].DestIP,
@@ -68,4 +68,10 @@ func conntrack(protocol string) ([]*conn, error) {
 		}
 	}
 	return conns, nil
+}
+
+func NewConntrack(protocol string) Conntrack {
+	return func() ([]*Conn, error) {
+		return conntrack(protocol)
+	}
 }

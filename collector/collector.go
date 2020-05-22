@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package collector
 
 import (
 	"log"
@@ -18,12 +18,24 @@ var (
 	desc             = prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", []string{"id", "name"}, nil)
 )
 
+type ContainerLister func() ([]*docker.Container, error)
+type Conntrack func() ([]*Conn, error)
+
 type ConntrackCollector struct {
-	containerLister func() ([]*docker.Container, error)
-	conntrack       func() ([]*conn, error)
+	containerLister ContainerLister
+	conntrack       Conntrack
 	sync.Mutex
 	connCount  map[string]map[string]int
 	containers map[string]*docker.Container
+}
+
+func New(containerLister ContainerLister, conntrack Conntrack) *ConntrackCollector {
+	return &ConntrackCollector{
+		containerLister: containerLister,
+		conntrack:       conntrack,
+		connCount:       make(map[string]map[string]int),
+		containers:      make(map[string]*docker.Container),
+	}
 }
 
 func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {

@@ -8,8 +8,8 @@ build:
 test:
 	go test ./...
 
-run: build
-	./bin/prometheus-conntrack
+run:
+	go run main.go
 
 bench:
 	go test -check.b -check.bmem

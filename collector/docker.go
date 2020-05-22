@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package collector
 
 import docker "github.com/fsouza/go-dockerclient"
 
@@ -28,4 +28,10 @@ func listContainers(endpoint string) ([]*docker.Container, error) {
 		containers[i] = container
 	}
 	return containers, nil
+}
+
+func NewDockerContainerLister(endpoint string) ContainerLister {
+	return func() ([]*docker.Container, error) {
+		return listContainers(endpoint)
+	}
 }
