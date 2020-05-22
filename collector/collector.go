@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tsuru/prometheus-conntrack/workload"
 )
 
 var (
@@ -18,23 +18,22 @@ var (
 	desc             = prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", []string{"id", "name"}, nil)
 )
 
-type ContainerLister func() ([]*docker.Container, error)
 type Conntrack func() ([]*Conn, error)
 
 type ConntrackCollector struct {
-	containerLister ContainerLister
-	conntrack       Conntrack
+	engine    workload.Engine
+	conntrack Conntrack
 	sync.Mutex
-	connCount  map[string]map[string]int
-	containers map[string]*docker.Container
+	connCount map[string]map[string]int
+	workloads map[string]*workload.Workload
 }
 
-func New(containerLister ContainerLister, conntrack Conntrack) *ConntrackCollector {
+func New(engine workload.Engine, conntrack Conntrack) *ConntrackCollector {
 	return &ConntrackCollector{
-		containerLister: containerLister,
-		conntrack:       conntrack,
-		connCount:       make(map[string]map[string]int),
-		containers:      make(map[string]*docker.Container),
+		engine:    engine,
+		conntrack: conntrack,
+		connCount: make(map[string]map[string]int),
+		workloads: make(map[string]*workload.Workload),
 	}
 }
 
@@ -43,8 +42,8 @@ func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
-	counts, currContainers := c.getState()
-	containers, err := c.containerLister()
+	counts, currWorkloads := c.getState()
+	workloads, err := c.engine.Workloads()
 	if err != nil {
 		log.Print(err)
 		return
@@ -54,10 +53,10 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Print(err)
 		return
 	}
-	for _, container := range containers {
+	for _, workload := range workloads {
 		for _, conn := range conns {
 			value := ""
-			switch container.NetworkSettings.IPAddress {
+			switch workload.IP {
 			case conn.SourceIP:
 				value = conn.DestinationIP + ":" + conn.DestinationPort
 			case conn.DestinationIP:
@@ -65,24 +64,24 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			if value != "" {
 				key := conn.State + "-" + conn.Protocol + "-" + value
-				if counts[container.ID] == nil {
-					counts[container.ID] = make(map[string]int)
+				if counts[workload.Name] == nil {
+					counts[workload.Name] = make(map[string]int)
 				}
-				counts[container.ID][key] = counts[container.ID][key] + 1
+				counts[workload.Name][key] = counts[workload.Name][key] + 1
 			}
-			currContainers[container.ID] = container
+			currWorkloads[workload.Name] = workload
 		}
 	}
-	c.setState(counts, currContainers)
-	sendMetrics(counts, currContainers, ch)
+	c.setState(counts, currWorkloads)
+	c.sendMetrics(counts, currWorkloads, ch)
 }
 
-func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]*docker.Container) {
+func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]*workload.Workload) {
 	c.Lock()
 	defer c.Unlock()
-	copyCont := make(map[string]*docker.Container)
-	for i, cont := range c.containers {
-		copyCont[cont.ID] = c.containers[i]
+	copyWorkloads := make(map[string]*workload.Workload)
+	for _, workload := range c.workloads {
+		copyWorkloads[workload.Name] = c.workloads[workload.Name]
 	}
 	copy := make(map[string]map[string]int)
 	for k, v := range c.connCount {
@@ -94,31 +93,34 @@ func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]*
 			innerCopy[ik] = 0
 		}
 		if len(innerCopy) == 0 {
-			delete(copyCont, k)
+			delete(copyWorkloads, k)
 			continue
 		}
 		copy[k] = innerCopy
 	}
-	return copy, copyCont
+	return copy, copyWorkloads
 }
 
-func (c *ConntrackCollector) setState(count map[string]map[string]int, containers map[string]*docker.Container) {
+func (c *ConntrackCollector) setState(count map[string]map[string]int, workloads map[string]*workload.Workload) {
 	c.Lock()
 	defer c.Unlock()
 	c.connCount = count
-	for k, v := range containers {
-		c.containers[k] = v
+	for k, v := range workloads {
+		c.workloads[k] = v
 	}
 }
 
-func sendMetrics(metrics map[string]map[string]int, containers map[string]*docker.Container, ch chan<- prometheus.Metric) {
-	for contID, count := range metrics {
-		labelsMap := containerLabels(containers[contID])
-		labels := make([]string, len(labelsMap)+len(additionalLabels))
-		values := make([]string, len(labelsMap)+len(additionalLabels))
-		i := 0
-		for k, v := range labelsMap {
-			labels[i] = sanitizeLabelName(k)
+func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
+	for worloadID, count := range metrics {
+		workload := workloads[worloadID]
+		labels := make([]string, 1+len(workload.Labels)+len(additionalLabels))
+		values := make([]string, 1+len(workload.Labels)+len(additionalLabels))
+
+		labels[0] = c.engine.Kind()
+		values[0] = workload.Name
+		i := 1
+		for k, v := range workload.Labels {
+			labels[i] = "label_" + sanitizeLabelName(k)
 			values[i] = v
 			i++
 		}
@@ -136,18 +138,6 @@ func sendMetrics(metrics map[string]map[string]int, containers map[string]*docke
 			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(v), values...)
 		}
 	}
-}
-
-func containerLabels(container *docker.Container) map[string]string {
-	labels := map[string]string{
-		"id":    container.ID,
-		"name":  container.Name,
-		"image": container.Config.Image,
-	}
-	for k, v := range container.Config.Labels {
-		labels["container_label_"+k] = v
-	}
-	return labels
 }
 
 func sanitizeLabelName(name string) string {

@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package collector
+package docker
 
 import (
+	"testing"
+
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/fsouza/go-dockerclient/testing"
+	dockerTesting "github.com/fsouza/go-dockerclient/testing"
 
 	check "gopkg.in/check.v1"
 )
@@ -28,13 +30,23 @@ func createContainer(c *check.C, url, name string) string {
 	return cont.ID
 }
 
-func (s *S) TestListContainers(c *check.C) {
-	dockerServer, err := testing.NewServer("127.0.0.1:0", nil, nil)
+var _ = check.Suite(&S{})
+
+func Test(t *testing.T) {
+	check.TestingT(t)
+}
+
+type S struct{}
+
+func (s *S) TestListWorkloads(c *check.C) {
+	dockerServer, err := dockerTesting.NewServer("127.0.0.1:0", nil, nil)
 	c.Assert(err, check.IsNil)
 	defer dockerServer.Stop()
-	id := createContainer(c, dockerServer.URL(), "my-container")
-	containers, err := listContainers(dockerServer.URL())
+	createContainer(c, dockerServer.URL(), "my-container")
+	engine := NewEngine(dockerServer.URL())
+	workloads, err := engine.Workloads()
 	c.Assert(err, check.IsNil)
-	c.Assert(len(containers), check.Equals, 1)
-	c.Assert(containers[0].ID, check.Equals, id)
+	c.Assert(len(workloads), check.Equals, 1)
+	c.Assert(workloads[0].Name, check.Equals, "my-container")
+	c.Assert(workloads[0].IP, check.Equals, "172.16.42.53")
 }

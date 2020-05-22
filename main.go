@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/tsuru/prometheus-conntrack/collector"
+	"github.com/tsuru/prometheus-conntrack/workload/docker"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	log.Printf("Fetching containers from %s...\n", *endpoint)
 	collector := collector.New(
-		collector.NewDockerContainerLister(*endpoint),
+		docker.NewEngine(*endpoint),
 		collector.NewConntrack(*protocol),
 	)
 	prometheus.MustRegister(collector)
