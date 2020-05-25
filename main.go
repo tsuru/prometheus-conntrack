@@ -14,20 +14,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/tsuru/prometheus-conntrack/collector"
+	"github.com/tsuru/prometheus-conntrack/workload"
 	"github.com/tsuru/prometheus-conntrack/workload/docker"
+	"github.com/tsuru/prometheus-conntrack/workload/kubelet"
 )
 
 func main() {
 	addr := flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
-	endpoint := flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Docker endpoint.")
+	dockerEndpoint := flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Docker endpoint.")
+	kubeletEndpoint := flag.String("kubelet-endpoint", "https://127.0.0.1:10250/pods", "Kubelet endpoint.")
 	protocol := flag.String("protocol", "", "Protocol to track connections. Defaults to all.")
+	engineName := flag.String("engine", "docker", "Engine to track local workload addresses. Defaults to docker.")
 	flag.Parse()
 	http.Handle("/metrics", promhttp.Handler())
-	log.Printf("Fetching containers from %s...\n", *endpoint)
-	collector := collector.New(
-		docker.NewEngine(*endpoint),
-		collector.NewConntrack(*protocol),
-	)
+
+	var engine workload.Engine
+	if *engineName == "kubelet" {
+		log.Printf("Fetching workload from kubelet: %s...\n", *kubeletEndpoint)
+		engine = kubelet.NewEngine(*kubeletEndpoint)
+	} else {
+		log.Printf("Fetching workload from docker: %s...\n", *dockerEndpoint)
+		engine = docker.NewEngine(*dockerEndpoint)
+	}
+
+	conntrack := collector.NewConntrack(*protocol)
+	collector := collector.New(engine, conntrack)
 	prometheus.MustRegister(collector)
 	log.Printf("HTTP server listening at %s...\n", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))
