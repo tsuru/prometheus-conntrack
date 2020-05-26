@@ -16,9 +16,16 @@ import (
 )
 
 var (
-	additionalLabels    = []string{"state", "protocol", "destination"}
+	additionalLabels    = []string{"state", "protocol", "destination", "direction"}
 	unusedConnectionTTL = 2 * time.Minute
 	desc                = prometheus.NewDesc("container_connections", "Number of outbound connections by destination and state", []string{"id", "name"}, nil)
+)
+
+type ConnDirection string
+
+var (
+	ConnectionMade     = ConnDirection("made")
+	ConnectionReceived = ConnDirection("received")
 )
 
 type Conntrack func() ([]*Conn, error)
@@ -28,6 +35,7 @@ type accumulatorKey struct {
 	state       string
 	protocol    string
 	destination string
+	direction   ConnDirection
 }
 
 type ConntrackCollector struct {
@@ -103,11 +111,14 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, workload := range workloads {
 		for _, conn := range conns {
 			destination := ""
+			var direction ConnDirection
 			switch workload.IP {
 			case conn.OriginIP:
 				destination = conn.ReplyIP + ":" + conn.ReplyPort
+				direction = ConnectionMade
 			case conn.ReplyIP:
-				destination = conn.OriginIP + ":" + conn.OriginPort
+				destination = ":" + conn.ReplyPort
+				direction = ConnectionReceived
 			}
 			if destination != "" {
 				key := accumulatorKey{
@@ -115,6 +126,7 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 					protocol:    conn.Protocol,
 					state:       conn.State,
 					destination: destination,
+					direction:   direction,
 				}
 				counts[key] = counts[key] + 1
 			}
@@ -168,6 +180,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 		values[i] = accumulator.state
 		values[i+1] = accumulator.protocol
 		values[i+2] = accumulator.destination
+		values[i+3] = string(accumulator.direction)
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(count), values...)
 		return true
 	})

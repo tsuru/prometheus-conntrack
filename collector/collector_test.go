@@ -37,9 +37,7 @@ func TestCollector(t *testing.T) {
 				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-			},
-			{
-				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "192.168.50.5", OriginPort: "33404", ReplyIP: "10.10.1.2", ReplyPort: "7070", State: "ESTABLISHED", Protocol: "tcp"},
 			},
 			{
 				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
@@ -61,8 +59,9 @@ func TestCollector(t *testing.T) {
 	promhttp.Handler().ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
 	lines := strings.Split(rr.Body.String(), "\n")
-	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 2`)
-	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",direction="made",label_app="app1",protocol="tcp",state="ESTABLISHED"} 2`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",direction="made",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination=":7070",direction="received",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
 
 	req, err = http.NewRequest("GET", "/metrics", nil)
 	require.NoError(t, err)
@@ -70,17 +69,8 @@ func TestCollector(t *testing.T) {
 	promhttp.Handler().ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
 	lines = strings.Split(rr.Body.String(), "\n")
-	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
-	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
-
-	req, err = http.NewRequest("GET", "/metrics", nil)
-	require.NoError(t, err)
-
-	rr = httptest.NewRecorder()
-	promhttp.Handler().ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
-	lines = strings.Split(rr.Body.String(), "\n")
-	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",direction="made",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",direction="made",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
 }
 
 func TestPerformMetricClean(t *testing.T) {
