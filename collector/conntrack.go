@@ -5,11 +5,14 @@
 package collector
 
 import (
-	"bytes"
-	"encoding/xml"
-	"fmt"
-	"os/exec"
+	"strconv"
+
+	ct "github.com/florianl/go-conntrack"
+	"github.com/pkg/errors"
 )
+
+// TCP_CONNTRACK_ESTABLISHED copied from: https://github.com/torvalds/linux/blob/master/include/uapi/linux/netfilter/nf_conntrack_tcp.h#L9
+var TCP_CONNTRACK_ESTABLISHED uint8 = 3
 
 type Conn struct {
 	SourceIP        string
@@ -36,37 +39,30 @@ type conntrackResult struct {
 }
 
 func conntrack(protocol string) ([]*Conn, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("conntrack", "-L", "-o", "xml")
-	if protocol != "" {
-		cmd.Args = append(cmd.Args, "-p", protocol)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	nfct, err := ct.Open(&ct.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("conntrack failed: %s. Output: %s", err, stderr.String())
+		return nil, errors.Wrap(err, "Could not create nfct")
 	}
-	var result conntrackResult
-	err = xml.Unmarshal(stdout.Bytes(), &result)
+	defer nfct.Close()
+	sessions, err := nfct.Dump(ct.Conntrack, ct.IPv4)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Could not dump sessions")
 	}
-	var conns []*Conn
-	for _, item := range result.Items {
-		if len(item.Metas) > 0 {
-			if item.Metas[0].SourceIP != "127.0.0.1" && item.Metas[0].DestIP != "127.0.0.1" {
-				conns = append(conns, &Conn{
-					SourceIP:        item.Metas[0].SourceIP,
-					SourcePort:      item.Metas[0].Layer4.SourcePort,
-					DestinationIP:   item.Metas[0].DestIP,
-					DestinationPort: item.Metas[0].Layer4.DestPort,
-					State:           item.Metas[2].State,
-					Protocol:        item.Metas[0].Layer4.Protocol,
-				})
-			}
+	conns := []*Conn{}
+	for _, session := range sessions {
+		if session.ProtoInfo == nil || session.ProtoInfo.TCP == nil || *session.ProtoInfo.TCP.State != TCP_CONNTRACK_ESTABLISHED {
+			continue
 		}
+		conns = append(conns, &Conn{
+			SourceIP:        session.Origin.Src.String(),
+			SourcePort:      port(session.Origin.Proto.SrcPort),
+			DestinationIP:   session.Reply.Src.String(),
+			DestinationPort: port(session.Reply.Proto.SrcPort),
+			State:           "ESTABLISHED",
+			Protocol:        "TCP",
+		})
 	}
+
 	return conns, nil
 }
 
@@ -74,4 +70,12 @@ func NewConntrack(protocol string) Conntrack {
 	return func() ([]*Conn, error) {
 		return conntrack(protocol)
 	}
+}
+
+func port(p *uint16) string {
+	if p == nil {
+		return ""
+	}
+
+	return strconv.Itoa(int(*p))
 }

@@ -10,6 +10,7 @@ require (
 	github.com/docker/docker v1.4.2-0.20161201193230-0020398c74e8 // indirect
 	github.com/docker/go-connections v0.2.2-0.20161115161849-4ccf312bf1d3 // indirect
 	github.com/docker/go-units v0.3.2-0.20161020213227-8a7beacffa30 // indirect
+	github.com/florianl/go-conntrack v0.1.1-0.20200305095641-39d61234c658
 	github.com/fsouza/go-dockerclient v0.0.0-20161206004320-4611598e6e66
 	github.com/golang/protobuf v0.0.0-20161117033126-8ee79997227b // indirect
 	github.com/gorilla/context v0.0.0-20160525203319-aed02d124ae4 // indirect
@@ -23,8 +24,6 @@ require (
 	github.com/prometheus/common v0.0.0-20161201123508-195bde7883f7 // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
 	github.com/stretchr/testify v1.5.1
-	github.com/tsuru/commandmocker v0.0.0-20160909010208-e1d28f4f616a
-	golang.org/x/net v0.0.0-20161027173718-b626cca987fa // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
 	gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2 // indirect
 )
