@@ -12,30 +12,15 @@ import (
 )
 
 // TCP_CONNTRACK_ESTABLISHED copied from: https://github.com/torvalds/linux/blob/master/include/uapi/linux/netfilter/nf_conntrack_tcp.h#L9
-var TCP_CONNTRACK_ESTABLISHED uint8 = 3
+const TCP_CONNTRACK_ESTABLISHED = 3
 
 type Conn struct {
-	SourceIP        string
-	DestinationIP   string
-	SourcePort      string
-	DestinationPort string
-	State           string
-	Protocol        string
-}
-
-type conntrackResult struct {
-	Items []struct {
-		Metas []struct {
-			SourceIP string `xml:"layer3>src"`
-			DestIP   string `xml:"layer3>dst"`
-			State    string `xml:"state"`
-			Layer4   struct {
-				SourcePort string `xml:"sport"`
-				DestPort   string `xml:"dport"`
-				Protocol   string `xml:"protoname,attr"`
-			} `xml:"layer4"`
-		} `xml:"meta"`
-	} `xml:"flow"`
+	OriginIP   string
+	ReplyIP    string
+	OriginPort string
+	ReplyPort  string
+	State      string
+	Protocol   string
 }
 
 func conntrack(protocol string) ([]*Conn, error) {
@@ -50,16 +35,17 @@ func conntrack(protocol string) ([]*Conn, error) {
 	}
 	conns := []*Conn{}
 	for _, session := range sessions {
+		// TODO(wpjunior): track UDP and SYN-SENT connections
 		if session.ProtoInfo == nil || session.ProtoInfo.TCP == nil || *session.ProtoInfo.TCP.State != TCP_CONNTRACK_ESTABLISHED {
 			continue
 		}
 		conns = append(conns, &Conn{
-			SourceIP:        session.Origin.Src.String(),
-			SourcePort:      port(session.Origin.Proto.SrcPort),
-			DestinationIP:   session.Reply.Src.String(),
-			DestinationPort: port(session.Reply.Proto.SrcPort),
-			State:           "ESTABLISHED",
-			Protocol:        "TCP",
+			OriginIP:   session.Origin.Src.String(),
+			OriginPort: port(session.Origin.Proto.SrcPort),
+			ReplyIP:    session.Reply.Src.String(),
+			ReplyPort:  port(session.Reply.Proto.SrcPort),
+			State:      "ESTABLISHED",
+			Protocol:   "TCP",
 		})
 	}
 

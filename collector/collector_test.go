@@ -7,8 +7,10 @@ package collector
 import (
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,15 +34,15 @@ func TestCollector(t *testing.T) {
 	conntrack := &fakeConntrack{
 		conns: [][]*Conn{
 			{
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.5", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
 			},
 			{
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 			},
 			{
-				{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 			},
 		},
 	}
@@ -79,23 +81,40 @@ func TestCollector(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	lines = strings.Split(rr.Body.String(), "\n")
 	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
-	assert.NotContains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
+}
+
+func TestPerformMetricClean(t *testing.T) {
+	collector := &ConntrackCollector{}
+	now := time.Now().UTC()
+	collector.lastUsedTuples.Store(accumulatorKey{workload: "w1", state: "estab", protocol: "tcp", destination: "blah"}, now.Add(time.Minute*-60))
+	collector.lastUsedTuples.Store(accumulatorKey{workload: "w2", state: "estab", protocol: "tcp", destination: "blah"}, now)
+	collector.lastUsedTuples.Store(accumulatorKey{workload: "w3", state: "estab", protocol: "tcp", destination: "blah"}, now.Add(time.Minute*60))
+
+	collector.performMetricCleaner()
+
+	keys := []string{}
+	collector.lastUsedTuples.Range(func(key, lastUsed interface{}) bool {
+		keys = append(keys, key.(accumulatorKey).workload)
+		return true
+	})
+	sort.Strings(keys)
+	assert.Equal(t, []string{"w2", "w3"}, keys)
 }
 
 func BenchmarkCollector(b *testing.B) {
 	conns := []*Conn{
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.3", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.6", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.3", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.7", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.3", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.6", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.5", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.3", SourcePort: "33404", DestinationIP: "192.168.50.5", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
-		{SourceIP: "10.10.1.1", SourcePort: "33404", DestinationIP: "192.168.50.6", DestinationPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.6", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.7", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.6", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.1", OriginPort: "33404", ReplyIP: "192.168.50.6", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
 	}
 
 	conntrack := func() ([]*Conn, error) {

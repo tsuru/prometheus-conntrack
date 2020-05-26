@@ -6,8 +6,8 @@ package collector
 
 import (
 	"log"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tsuru/prometheus-conntrack/workload"
@@ -16,30 +16,49 @@ import (
 )
 
 var (
-	additionalLabels = []string{"state", "protocol", "destination"}
-	desc             = prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", []string{"id", "name"}, nil)
+	additionalLabels    = []string{"state", "protocol", "destination"}
+	unusedConnectionTTL = 2 * time.Minute
+	desc                = prometheus.NewDesc("container_connections", "Number of outbound connections by destination and state", []string{"id", "name"}, nil)
 )
 
 type Conntrack func() ([]*Conn, error)
 
+type accumulatorKey struct {
+	workload    string
+	state       string
+	protocol    string
+	destination string
+}
+
 type ConntrackCollector struct {
-	engine    workload.Engine
-	conntrack Conntrack
-	sync.Mutex
-	connCount             map[string]map[string]int
-	workloads             map[string]*workload.Workload
-	workloadLabels        []string
-	fetchWorkloads        prometheus.Counter
-	fetchWorkloadFailures prometheus.Counter
+	engine                  workload.Engine
+	conntrack               Conntrack
+	workloadLabels          []string
+	sanitizedWorkloadLabels []string
+	metricTupleSize         int
+	fetchWorkloads          prometheus.Counter
+	fetchWorkloadFailures   prometheus.Counter
+
+	// lastUsedTuples works such as a TTL, prometheus needs to know when connection is closed
+	// then we will inform metric with 0 value for a while
+	lastUsedTuples sync.Map
 }
 
 func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string) *ConntrackCollector {
-	return &ConntrackCollector{
-		engine:         engine,
-		conntrack:      conntrack,
-		connCount:      make(map[string]map[string]int),
-		workloads:      make(map[string]*workload.Workload),
-		workloadLabels: workloadLabels,
+	sanitizedWorkloadLabels := []string{engine.Kind()}
+	for _, workloadLabel := range workloadLabels {
+		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, "label_"+promstrutil.SanitizeLabelName(workloadLabel))
+	}
+	for _, label := range additionalLabels {
+		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, label)
+	}
+
+	collector := &ConntrackCollector{
+		engine:                  engine,
+		conntrack:               conntrack,
+		workloadLabels:          workloadLabels,
+		sanitizedWorkloadLabels: sanitizedWorkloadLabels,
+		metricTupleSize:         1 + len(workloadLabels) + len(additionalLabels),
 		fetchWorkloads: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: "conntrack",
 			Subsystem: "workload",
@@ -53,6 +72,9 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string) *
 			Help:      "Number of failures to get workloads",
 		}),
 	}
+
+	go collector.metricCleaner()
+	return collector
 }
 
 func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -76,90 +98,77 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Print(err)
 		return
 	}
-	counts, currWorkloads := c.getState()
+	counts := map[accumulatorKey]int{}
+	workloadMap := map[string]*workload.Workload{}
 	for _, workload := range workloads {
 		for _, conn := range conns {
-			value := ""
+			destination := ""
 			switch workload.IP {
-			case conn.SourceIP:
-				value = conn.DestinationIP + ":" + conn.DestinationPort
-			case conn.DestinationIP:
-				value = conn.SourceIP + ":" + conn.SourcePort
+			case conn.OriginIP:
+				destination = conn.ReplyIP + ":" + conn.ReplyPort
+			case conn.ReplyIP:
+				destination = conn.OriginIP + ":" + conn.OriginPort
 			}
-			if value != "" {
-				key := conn.State + "-" + conn.Protocol + "-" + value
-				if counts[workload.Name] == nil {
-					counts[workload.Name] = make(map[string]int)
+			if destination != "" {
+				key := accumulatorKey{
+					workload:    workload.Name,
+					protocol:    conn.Protocol,
+					state:       conn.State,
+					destination: destination,
 				}
-				counts[workload.Name][key] = counts[workload.Name][key] + 1
+				counts[key] = counts[key] + 1
 			}
-			currWorkloads[workload.Name] = workload
 		}
+
+		workloadMap[workload.Name] = workload
 	}
-	c.setState(counts, currWorkloads)
-	c.sendMetrics(counts, currWorkloads, ch)
+
+	now := time.Now().UTC()
+	for accumulatorKey := range counts {
+		c.lastUsedTuples.Store(accumulatorKey, now)
+	}
+
+	c.sendMetrics(counts, workloadMap, ch)
 }
 
-func (c *ConntrackCollector) getState() (map[string]map[string]int, map[string]*workload.Workload) {
-	c.Lock()
-	defer c.Unlock()
-	copyWorkloads := make(map[string]*workload.Workload)
-	for _, workload := range c.workloads {
-		copyWorkloads[workload.Name] = c.workloads[workload.Name]
-	}
-	copy := make(map[string]map[string]int)
-	for k, v := range c.connCount {
-		innerCopy := make(map[string]int)
-		for ik, iv := range v {
-			if iv == 0 {
-				continue
-			}
-			innerCopy[ik] = 0
-		}
-		if len(innerCopy) == 0 {
-			delete(copyWorkloads, k)
-			continue
-		}
-		copy[k] = innerCopy
-	}
-	return copy, copyWorkloads
-}
-
-func (c *ConntrackCollector) setState(count map[string]map[string]int, workloads map[string]*workload.Workload) {
-	c.Lock()
-	defer c.Unlock()
-	c.connCount = count
-	for k, v := range workloads {
-		c.workloads[k] = v
+func (c *ConntrackCollector) metricCleaner() {
+	for {
+		c.performMetricCleaner()
+		time.Sleep(unusedConnectionTTL)
 	}
 }
 
-func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
-	for worloadID, count := range metrics {
-		workload := workloads[worloadID]
-		labels := make([]string, 1+len(c.workloadLabels)+len(additionalLabels))
-		values := make([]string, 1+len(c.workloadLabels)+len(additionalLabels))
+func (c *ConntrackCollector) performMetricCleaner() {
+	now := time.Now().UTC()
+	c.lastUsedTuples.Range(func(key, lastUsed interface{}) bool {
+		accumulator := key.(accumulatorKey)
+		lastUsedTime := lastUsed.(time.Time)
 
-		labels[0] = c.engine.Kind()
+		if now.After(lastUsedTime.Add(unusedConnectionTTL)) {
+			c.lastUsedTuples.Delete(accumulator)
+		}
+		return true
+	})
+}
+
+func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
+	c.lastUsedTuples.Range(func(key, _ interface{}) bool {
+		accumulator := key.(accumulatorKey)
+		count := counts[accumulator]
+		workload := workloads[accumulator.workload]
+		values := make([]string, c.metricTupleSize)
+
 		values[0] = workload.Name
 		i := 1
 		for _, k := range c.workloadLabels {
-			labels[i] = "label_" + promstrutil.SanitizeLabelName(k)
 			values[i] = workload.Labels[k]
 			i++
 		}
-		for _, l := range additionalLabels {
-			labels[i] = l
-			i++
-		}
-		i = i - len(additionalLabels)
-		desc := prometheus.NewDesc("conntrack_workload_connections", "Number of outbound connections by destionation and state", labels, nil)
-		for k, v := range count {
-			keys := strings.SplitN(k, "-", 3)
-			values[i] = keys[0]
-			values[i+1] = keys[1]
-			values[i+2] = keys[2]
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(v), values...)
-		}
-	}
+		desc := prometheus.NewDesc("conntrack_workload_connections", "Number of outbound connections by destination and state", c.sanitizedWorkloadLabels, nil)
+		values[i] = accumulator.state
+		values[i+1] = accumulator.protocol
+		values[i+2] = accumulator.destination
+		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(count), values...)
+		return true
+	})
 }
