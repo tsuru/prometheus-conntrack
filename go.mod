@@ -23,6 +23,7 @@ require (
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 // indirect
 	github.com/prometheus/common v0.0.0-20161201123508-195bde7883f7 // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
+	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
 	gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2 // indirect

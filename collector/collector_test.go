@@ -59,8 +59,8 @@ func TestCollector(t *testing.T) {
 	promhttp.Handler().ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
 	lines := strings.Split(rr.Body.String(), "\n")
-	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 2`)
-	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 2`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
 
 	req, err = http.NewRequest("GET", "/metrics", nil)
 	require.NoError(t, err)
@@ -68,8 +68,8 @@ func TestCollector(t *testing.T) {
 	promhttp.Handler().ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
 	lines = strings.Split(rr.Body.String(), "\n")
-	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
-	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
 
 	req, err = http.NewRequest("GET", "/metrics", nil)
 	require.NoError(t, err)
@@ -78,8 +78,8 @@ func TestCollector(t *testing.T) {
 	promhttp.Handler().ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
 	lines = strings.Split(rr.Body.String(), "\n")
-	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
-	assert.NotContains(t, lines, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
+	assert.Contains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.NotContains(t, lines, `conntrack_workload_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
 }
 
 func BenchmarkCollector(b *testing.B) {

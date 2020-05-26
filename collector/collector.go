@@ -11,6 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tsuru/prometheus-conntrack/workload"
+
+	promstrutil "github.com/prometheus/prometheus/util/strutil"
 )
 
 var (
@@ -142,7 +144,7 @@ func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, work
 		values[0] = workload.Name
 		i := 1
 		for _, k := range c.workloadLabels {
-			labels[i] = "label_" + sanitizeLabelName(k)
+			labels[i] = "label_" + promstrutil.SanitizeLabelName(k)
 			values[i] = workload.Labels[k]
 			i++
 		}
@@ -151,7 +153,7 @@ func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, work
 			i++
 		}
 		i = i - len(additionalLabels)
-		desc := prometheus.NewDesc("container_connections", "Number of outbound connections by destionation and state", labels, nil)
+		desc := prometheus.NewDesc("conntrack_workload_connections", "Number of outbound connections by destionation and state", labels, nil)
 		for k, v := range count {
 			keys := strings.SplitN(k, "-", 3)
 			values[i] = keys[0]
@@ -160,8 +162,4 @@ func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, work
 			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(v), values...)
 		}
 	}
-}
-
-func sanitizeLabelName(name string) string {
-	return strings.Replace(name, ".", "_", -1)
 }
