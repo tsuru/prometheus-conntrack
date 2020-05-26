@@ -20,6 +20,7 @@ type podList struct {
 }
 type pod struct {
 	Metadata podMetadata `json:"metadata"`
+	Spec     podSpec     `json:"spec"`
 	Status   podStatus   `json:"status"`
 }
 
@@ -27,6 +28,10 @@ type podMetadata struct {
 	Name      string            `json:"name"`
 	Namespace string            `json:"namespace"`
 	Labels    map[string]string `json:"labels"`
+}
+
+type podSpec struct {
+	HostNetwork bool `json:"hostNetwork"`
 }
 
 type podStatus struct {
@@ -67,6 +72,11 @@ func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 	}
 
 	for _, pod := range list.Items {
+		// we skip all pods with hostNetwork because its use the same ip of host
+		// and may generate a mess in the metrics
+		if pod.Spec.HostNetwork {
+			continue
+		}
 		pod.Metadata.Labels["pod_namespace"] = pod.Metadata.Namespace
 		workloads = append(workloads, &workload.Workload{
 			Name:   pod.Metadata.Name,

@@ -30,6 +30,21 @@ func TestListWorkloads(t *testing.T) {
 						PodIP: "10.27.24.12",
 					},
 				},
+				{
+					Metadata: podMetadata{
+						Name:      "my-host-pod",
+						Namespace: "kube",
+						Labels: map[string]string{
+							"version": "v3",
+						},
+					},
+					Spec: podSpec{
+						HostNetwork: true,
+					},
+					Status: podStatus{
+						PodIP: "171.1.1.2",
+					},
+				},
 			},
 		})
 	}))
