@@ -24,16 +24,32 @@ type ConntrackCollector struct {
 	engine    workload.Engine
 	conntrack Conntrack
 	sync.Mutex
-	connCount map[string]map[string]int
-	workloads map[string]*workload.Workload
+	connCount             map[string]map[string]int
+	workloads             map[string]*workload.Workload
+	workloadLabels        []string
+	fetchWorkloads        prometheus.Counter
+	fetchWorkloadFailures prometheus.Counter
 }
 
-func New(engine workload.Engine, conntrack Conntrack) *ConntrackCollector {
+func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string) *ConntrackCollector {
 	return &ConntrackCollector{
-		engine:    engine,
-		conntrack: conntrack,
-		connCount: make(map[string]map[string]int),
-		workloads: make(map[string]*workload.Workload),
+		engine:         engine,
+		conntrack:      conntrack,
+		connCount:      make(map[string]map[string]int),
+		workloads:      make(map[string]*workload.Workload),
+		workloadLabels: workloadLabels,
+		fetchWorkloads: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: "conntrack",
+			Subsystem: "workload",
+			Name:      "fetch_total",
+			Help:      "Number of fetchs to discover workloads",
+		}),
+		fetchWorkloadFailures: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: "conntrack",
+			Subsystem: "workload",
+			Name:      "failures_total",
+			Help:      "Number of failures to get workloads",
+		}),
 	}
 }
 
@@ -42,17 +58,23 @@ func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
-	counts, currWorkloads := c.getState()
+	c.fetchWorkloads.Inc()
+	ch <- c.fetchWorkloads
 	workloads, err := c.engine.Workloads()
 	if err != nil {
+		c.fetchWorkloadFailures.Inc()
+		ch <- c.fetchWorkloadFailures
 		log.Print(err)
 		return
 	}
+	ch <- c.fetchWorkloadFailures
+
 	conns, err := c.conntrack()
 	if err != nil {
 		log.Print(err)
 		return
 	}
+	counts, currWorkloads := c.getState()
 	for _, workload := range workloads {
 		for _, conn := range conns {
 			value := ""
@@ -113,15 +135,15 @@ func (c *ConntrackCollector) setState(count map[string]map[string]int, workloads
 func (c *ConntrackCollector) sendMetrics(metrics map[string]map[string]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
 	for worloadID, count := range metrics {
 		workload := workloads[worloadID]
-		labels := make([]string, 1+len(workload.Labels)+len(additionalLabels))
-		values := make([]string, 1+len(workload.Labels)+len(additionalLabels))
+		labels := make([]string, 1+len(c.workloadLabels)+len(additionalLabels))
+		values := make([]string, 1+len(c.workloadLabels)+len(additionalLabels))
 
 		labels[0] = c.engine.Kind()
 		values[0] = workload.Name
 		i := 1
-		for k, v := range workload.Labels {
+		for _, k := range c.workloadLabels {
 			labels[i] = "label_" + sanitizeLabelName(k)
-			values[i] = v
+			values[i] = workload.Labels[k]
 			i++
 		}
 		for _, l := range additionalLabels {

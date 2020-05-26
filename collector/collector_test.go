@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tsuru/prometheus-conntrack/workload"
 	workloadTesting "github.com/tsuru/prometheus-conntrack/workload/testing"
-	check "gopkg.in/check.v1"
 )
 
 type fakeConntrack struct {
@@ -26,7 +28,7 @@ func (f *fakeConntrack) conntrack() ([]*Conn, error) {
 	return f.conns[f.calls-1], nil
 }
 
-func (*S) TestCollector(c *check.C) {
+func TestCollector(t *testing.T) {
 	conntrack := &fakeConntrack{
 		conns: [][]*Conn{
 			{
@@ -45,40 +47,42 @@ func (*S) TestCollector(c *check.C) {
 
 	collector := New(
 		workloadTesting.New("containerd", "container", []*workload.Workload{
-			{Name: "my-container1", IP: "10.10.1.2", Labels: map[string]string{"label1": "val1"}},
+			{Name: "my-container1", IP: "10.10.1.2", Labels: map[string]string{"label1": "val1", "app": "app1"}},
 		}),
 		conntrack.conntrack,
+		[]string{"app"},
 	)
 	prometheus.MustRegister(collector)
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/metrics", nil)
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 	promhttp.Handler().ServeHTTP(rr, req)
-	c.Assert(rr.Code, check.Equals, http.StatusOK)
+	assert.Equal(t, http.StatusOK, rr.Code)
 	lines := strings.Split(rr.Body.String(), "\n")
-	c.Assert(lines[2], check.Equals, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_label1="val1",protocol="tcp",state="ESTABLISHED"} 2`)
-	c.Assert(lines[3], check.Equals, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_label1="val1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 2`)
+	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
 
 	req, err = http.NewRequest("GET", "/metrics", nil)
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 	rr = httptest.NewRecorder()
 	promhttp.Handler().ServeHTTP(rr, req)
-	c.Assert(rr.Code, check.Equals, http.StatusOK)
+	assert.Equal(t, http.StatusOK, rr.Code)
 	lines = strings.Split(rr.Body.String(), "\n")
-	c.Assert(lines[2], check.Equals, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_label1="val1",protocol="tcp",state="ESTABLISHED"} 1`)
-	c.Assert(lines[3], check.Equals, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_label1="val1",protocol="tcp",state="ESTABLISHED"} 0`)
+	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
 
 	req, err = http.NewRequest("GET", "/metrics", nil)
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
+
 	rr = httptest.NewRecorder()
 	promhttp.Handler().ServeHTTP(rr, req)
-	c.Assert(rr.Code, check.Equals, http.StatusOK)
+	assert.Equal(t, http.StatusOK, rr.Code)
 	lines = strings.Split(rr.Body.String(), "\n")
-	c.Assert(lines[2], check.Equals, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_label1="val1",protocol="tcp",state="ESTABLISHED"} 1`)
-	c.Assert(lines[3], check.Not(check.Equals), `container_connections{container="my-container1",destination="192.168.50.5:2376",label_label1="val1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.Contains(t, lines, `container_connections{container="my-container1",destination="192.168.50.4:2375",label_app="app1",protocol="tcp",state="ESTABLISHED"} 1`)
+	assert.NotContains(t, lines, `container_connections{container="my-container1",destination="192.168.50.5:2376",label_app="app1",protocol="tcp",state="ESTABLISHED"} 0`)
 }
 
-func (s *S) BenchmarkCollector(c *check.C) {
+func BenchmarkCollector(b *testing.B) {
 	conns := []*Conn{
 		{SourceIP: "10.10.1.2", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "10.10.1.3", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
@@ -103,13 +107,14 @@ func (s *S) BenchmarkCollector(c *check.C) {
 			{Name: "my-container2", IP: "10.10.1.3"},
 		}),
 		conntrack,
+		[]string{},
 	)
 	ch := make(chan prometheus.Metric)
 	go func() {
 		for _ = range ch {
 		}
 	}()
-	for n := 0; n < c.N; n++ {
+	for n := 0; n < b.N; n++ {
 		collector.Collect(ch)
 	}
 	close(ch)

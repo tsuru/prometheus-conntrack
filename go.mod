@@ -17,11 +17,14 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.0.0-20160407174126-ad28ea4487f0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/opencontainers/runc v1.0.0-rc2.0.20161027022316-e7abf30cb820 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v0.8.1-0.20161124155732-575f371f7862
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 // indirect
 	github.com/prometheus/common v0.0.0-20161201123508-195bde7883f7 // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
+	github.com/stretchr/testify v1.5.1
 	github.com/tsuru/commandmocker v0.0.0-20160909010208-e1d28f4f616a
 	golang.org/x/net v0.0.0-20161027173718-b626cca987fa // indirect
-	gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2
+	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
+	gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2 // indirect
 )

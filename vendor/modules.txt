@@ -12,6 +12,8 @@ github.com/Sirupsen/logrus
 # github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a
 ## explicit
 github.com/beorn7/perks/quantile
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
 # github.com/docker/docker v1.4.2-0.20161201193230-0020398c74e8
 ## explicit
 github.com/docker/docker/api/types
@@ -68,6 +70,11 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 ## explicit
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
+# github.com/pkg/errors v0.9.1
+## explicit
+github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v0.8.1-0.20161124155732-575f371f7862
 ## explicit
 github.com/prometheus/client_golang/prometheus
@@ -83,6 +90,10 @@ github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9
 ## explicit
 github.com/prometheus/procfs
+# github.com/stretchr/testify v1.5.1
+## explicit
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
 # github.com/tsuru/commandmocker v0.0.0-20160909010208-e1d28f4f616a
 ## explicit
 github.com/tsuru/commandmocker
@@ -90,9 +101,12 @@ github.com/tsuru/commandmocker
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
+# golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
+## explicit
 # golang.org/x/sys v0.0.0-20190507160741-ecd444e8653b
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2
 ## explicit
-gopkg.in/check.v1
+# gopkg.in/yaml.v2 v2.2.2
+gopkg.in/yaml.v2

@@ -5,10 +5,13 @@
 package kubelet
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
-	"errors"
+	"io/ioutil"
 	"net/http"
 
+	"github.com/pkg/errors"
 	"github.com/tsuru/prometheus-conntrack/workload"
 )
 
@@ -31,7 +34,9 @@ type podStatus struct {
 }
 
 type kubeletEngine struct {
-	endpoint string
+	Opts
+
+	client *http.Client
 }
 
 func (d *kubeletEngine) Name() string {
@@ -45,12 +50,12 @@ func (d *kubeletEngine) Kind() string {
 func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 	workloads := []*workload.Workload{}
 
-	// TODO(wpjunior): add kubernetes authentication
-	req, _ := http.NewRequest(http.MethodGet, k.endpoint, nil)
-	response, err := http.DefaultClient.Do(req)
+	req, _ := http.NewRequest(http.MethodGet, k.Endpoint, nil)
+	response, err := k.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		return nil, errors.New("Invalid response code")
 	}
@@ -73,6 +78,39 @@ func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 	return workloads, nil
 }
 
-func NewEngine(endpoint string) workload.Engine {
-	return &kubeletEngine{endpoint: endpoint}
+type Opts struct {
+	Endpoint string
+	Key      string
+	Cert     string
+	CA       string
+}
+
+func NewEngine(opts Opts) (workload.Engine, error) {
+	engine := &kubeletEngine{Opts: opts, client: http.DefaultClient}
+
+	if opts.Key != "" && opts.Cert != "" {
+		cert, err := tls.LoadX509KeyPair(opts.Cert, opts.Key)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not read cert and key file")
+		}
+
+		caCert, err := ioutil.ReadFile(opts.CA)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not read CA file")
+		}
+
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		// Setup HTTPS client
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      caCertPool,
+		}
+		tlsConfig.BuildNameToCertificate()
+		transport := &http.Transport{TLSClientConfig: tlsConfig}
+		engine.client = &http.Client{Transport: transport}
+	}
+
+	return engine, nil
 }

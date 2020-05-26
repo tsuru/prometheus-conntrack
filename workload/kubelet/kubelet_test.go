@@ -10,18 +10,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	check "gopkg.in/check.v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var _ = check.Suite(&S{})
-
-func Test(t *testing.T) {
-	check.TestingT(t)
-}
-
-type S struct{}
-
-func (s *S) TestListWorkloads(c *check.C) {
+func TestListWorkloads(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&podList{
 			Items: []pod{
@@ -42,13 +35,14 @@ func (s *S) TestListWorkloads(c *check.C) {
 	}))
 	defer ts.Close()
 
-	engine := NewEngine(ts.URL)
+	engine, err := NewEngine(Opts{Endpoint: ts.URL})
+	require.NoError(t, err)
 	workloads, err := engine.Workloads()
-	c.Assert(err, check.IsNil)
-	c.Assert(len(workloads), check.Equals, 1)
-	c.Assert(workloads[0].Name, check.Equals, "my-pod")
-	c.Assert(workloads[0].IP, check.Equals, "10.27.24.12")
-	c.Assert(workloads[0].Labels, check.DeepEquals, map[string]string{
+	require.NoError(t, err)
+	assert.Len(t, workloads, 1)
+	assert.Equal(t, workloads[0].Name, "my-pod")
+	assert.Equal(t, workloads[0].IP, "10.27.24.12")
+	assert.Equal(t, workloads[0].Labels, map[string]string{
 		"pod_namespace": "tsuru",
 		"version":       "v3",
 	})

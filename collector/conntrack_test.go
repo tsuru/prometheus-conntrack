@@ -7,24 +7,17 @@ package collector
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tsuru/commandmocker"
-	"gopkg.in/check.v1"
 )
 
-var _ = check.Suite(&S{})
-
-func Test(t *testing.T) {
-	check.TestingT(t)
-}
-
-type S struct{}
-
-func (*S) TestConntrack(c *check.C) {
+func TestConntrack(t *testing.T) {
 	dir, err := commandmocker.Add("conntrack", conntrackXML)
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 	defer commandmocker.Remove(dir)
 	conns, err := conntrack("")
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 	expected := []*Conn{
 		{SourceIP: "192.168.50.4", SourcePort: "33404", DestinationIP: "192.168.50.4", DestinationPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "172.17.42.1", SourcePort: "42418", DestinationIP: "172.17.0.2", DestinationPort: "4001", State: "ESTABLISHED", Protocol: "tcp"},
@@ -38,26 +31,25 @@ func (*S) TestConntrack(c *check.C) {
 		{SourceIP: "172.17.0.27", SourcePort: "39492", DestinationIP: "172.17.42.1", DestinationPort: "4001", State: "ESTABLISHED", Protocol: "tcp"},
 		{SourceIP: "10.211.55.2", SourcePort: "51370", DestinationIP: "10.211.55.184", DestinationPort: "22", State: "ESTABLISHED", Protocol: "tcp"},
 	}
-	c.Assert(conns, check.DeepEquals, expected)
-	c.Assert(commandmocker.Parameters(dir), check.DeepEquals, []string{"-L", "-o", "xml"})
+	assert.Equal(t, expected, conns)
+	assert.Equal(t, []string{"-L", "-o", "xml"}, commandmocker.Parameters(dir))
 }
 
-func (*S) TestConntrackFilterProtocols(c *check.C) {
+func TestConntrackFilterProtocols(t *testing.T) {
 	dir, err := commandmocker.Add("conntrack", conntrackXML)
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 	defer commandmocker.Remove(dir)
 	_, err = conntrack("tcp")
-	c.Assert(err, check.IsNil)
-	c.Assert(commandmocker.Parameters(dir), check.DeepEquals, []string{"-L", "-o", "xml", "-p", "tcp"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"-L", "-o", "xml", "-p", "tcp"}, commandmocker.Parameters(dir))
 }
 
-func (*S) TestConntrackCommandFailure(c *check.C) {
+func TestConntrackCommandFailure(t *testing.T) {
 	dir, err := commandmocker.Error("conntrack", "something went wrong", 120)
-	c.Assert(err, check.IsNil)
+	require.NoError(t, err)
 	defer commandmocker.Remove(dir)
-	conns, err := conntrack("")
-	c.Assert(err, check.ErrorMatches, "conntrack failed: exit status 120. Output: something went wrong")
-	c.Assert(conns, check.IsNil)
+	_, err = conntrack("")
+	assert.EqualError(t, err, "conntrack failed: exit status 120. Output: something went wrong")
 }
 
 const conntrackXML = `<?xml version="1.0" encoding="utf-8"?>
