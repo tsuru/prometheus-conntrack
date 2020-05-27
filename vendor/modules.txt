@@ -67,6 +67,9 @@ github.com/gorilla/mux
 # github.com/hashicorp/go-cleanhttp v0.0.0-20160407174126-ad28ea4487f0
 ## explicit
 github.com/hashicorp/go-cleanhttp
+# github.com/lorenzosaino/go-sysctl v0.1.0
+## explicit
+github.com/lorenzosaino/go-sysctl
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 ## explicit
 github.com/matttproud/golang_protobuf_extensions/pbutil

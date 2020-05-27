@@ -12,6 +12,7 @@ import (
 
 	_ "net/http/pprof"
 
+	sysctl "github.com/lorenzosaino/go-sysctl"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/tsuru/prometheus-conntrack/collector"
@@ -20,11 +21,14 @@ import (
 	"github.com/tsuru/prometheus-conntrack/workload/kubelet"
 )
 
+const conntrackTimestampFlag = "net.netfilter.nf_conntrack_timestamp"
+
 func main() {
 	addr := flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 	protocol := flag.String("protocol", "", "Protocol to track connections. Defaults to all.")
 	engineName := flag.String("engine", "docker", "Engine to track local workload addresses. Defaults to docker.")
 	workloadLabelsString := flag.String("workload-labels", "", "Labels to extract from workload. ie (tsuru.io/app-name,tsuru.io/process-name)")
+	trackSynSent := flag.Bool("track-syn-sent", false, "Turn on track of stuck connections with syn-sent, will enable automatically the net.netfilter.nf_conntrack_timestamp flag on kernel.")
 
 	dockerEndpoint := flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Docker endpoint.")
 	kubeletEndpoint := flag.String("kubelet-endpoint", "https://127.0.0.1:10250/pods", "Kubelet endpoint.")
@@ -33,6 +37,11 @@ func main() {
 	kubeletCA := flag.String("kubelet-ca", "", "Path to a CA to authenticate on kubelet.")
 
 	flag.Parse()
+
+	if *trackSynSent {
+		enableConntrackTimestamps()
+	}
+
 	http.Handle("/metrics", promhttp.Handler())
 
 	var engine workload.Engine
@@ -59,4 +68,24 @@ func main() {
 	prometheus.MustRegister(collector)
 	log.Printf("HTTP server listening at %s...\n", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))
+}
+
+func enableConntrackTimestamps() {
+	val, err := sysctl.Get(conntrackTimestampFlag)
+	if err != nil {
+		log.Printf("Could not get status of %s, err\n", conntrackTimestampFlag, err.Error())
+		return
+	}
+	if val == "1" {
+		log.Printf("Flag %s is already turned on", conntrackTimestampFlag)
+		return
+	}
+	err = sysctl.Set(conntrackTimestampFlag, "1")
+	if err != nil {
+		log.Printf("Could not set status of %s, err\n", conntrackTimestampFlag, err.Error())
+		return
+	}
+
+	log.Printf("Flag %s was turned on", conntrackTimestampFlag)
+
 }

@@ -16,6 +16,7 @@ require (
 	github.com/gorilla/context v0.0.0-20160525203319-aed02d124ae4 // indirect
 	github.com/gorilla/mux v0.0.0-20160920230813-757bef944d0f // indirect
 	github.com/hashicorp/go-cleanhttp v0.0.0-20160407174126-ad28ea4487f0 // indirect
+	github.com/lorenzosaino/go-sysctl v0.1.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/opencontainers/runc v1.0.0-rc2.0.20161027022316-e7abf30cb820 // indirect
 	github.com/pkg/errors v0.9.1
