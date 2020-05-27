@@ -6,7 +6,6 @@ go:
   - tip
 script:
   - make test
-  - make build
 env:
   global:
     - GOARCH=amd64
