@@ -12,11 +12,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// copied from: https://github.com/torvalds/linux/blob/master/include/uapi/linux/netfilter/nf_conntrack_tcp.h#L9
 var (
+	// copied from: https://github.com/torvalds/linux/blob/master/include/uapi/linux/netfilter/nf_conntrack_tcp.h#L9
 	TCP_CONNTRACK_SYN_SENT    uint8 = 1
 	TCP_CONNTRACK_ESTABLISHED uint8 = 3
 	TCP_CONNTRACK_CLOSE_WAIT  uint8 = 5
+
+	// copied from: https://github.com/torvalds/linux/blob/0d81a3f29c0afb18ba2b1275dcccf21e0dd4da38/include/uapi/linux/in.h#L28
+	IPPROTO_TCP uint8 = 6
+	IPPROTO_UDP uint8 = 17
 )
 
 var syncSentToleration = time.Second * 10
@@ -49,16 +53,8 @@ func convertContrackEntryToConn(entries []ct.Con) []*Conn {
 	conns := []*Conn{}
 	synSentDeadline := now.Add(syncSentToleration * -1)
 	for _, entry := range entries {
-		// TODO(wpjunior): track UDP connections
-		if entry.ProtoInfo == nil || entry.ProtoInfo.TCP == nil {
-			continue
-		}
-		var state string
-		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_ESTABLISHED {
-			state = "ESTABLISHED"
-		} else if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_SYN_SENT && entry.Timestamp != nil && entry.Timestamp.Start.Before(synSentDeadline) {
-			state = "SYN-SENT"
-		} else {
+		proto, state := extractPROTOAndState(&entry, synSentDeadline)
+		if state == "" {
 			continue
 		}
 		conns = append(conns, &Conn{
@@ -67,10 +63,29 @@ func convertContrackEntryToConn(entries []ct.Con) []*Conn {
 			ReplyIP:    entry.Reply.Src.String(),
 			ReplyPort:  port(entry.Reply.Proto.SrcPort),
 			State:      state,
-			Protocol:   "TCP",
+			Protocol:   proto,
 		})
 	}
 	return conns
+}
+
+func extractPROTOAndState(entry *ct.Con, synSentDeadline time.Time) (proto, state string) {
+	if *entry.Origin.Proto.Number == IPPROTO_TCP && entry.ProtoInfo != nil && entry.ProtoInfo.TCP != nil {
+		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_ESTABLISHED {
+			return "TCP", "ESTABLISHED"
+		}
+		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_SYN_SENT && entry.Timestamp != nil && entry.Timestamp.Start.Before(synSentDeadline) {
+			return "TCP", "SYN-SENT"
+		}
+
+		return "", ""
+	}
+
+	if *entry.Origin.Proto.Number == IPPROTO_UDP {
+		return "UDP", "CONNECTED"
+	}
+
+	return "", ""
 }
 
 func NewConntrack(protocol string) Conntrack {
