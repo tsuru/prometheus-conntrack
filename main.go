@@ -73,7 +73,7 @@ func main() {
 func enableConntrackTimestamps() {
 	val, err := sysctl.Get(conntrackTimestampFlag)
 	if err != nil {
-		log.Printf("Could not get status of %s, err\n", conntrackTimestampFlag, err.Error())
+		log.Printf("Could not get status of %s, err: %s", conntrackTimestampFlag, err.Error())
 		return
 	}
 	if val == "1" {
@@ -82,7 +82,7 @@ func enableConntrackTimestamps() {
 	}
 	err = sysctl.Set(conntrackTimestampFlag, "1")
 	if err != nil {
-		log.Printf("Could not set status of %s, err\n", conntrackTimestampFlag, err.Error())
+		log.Printf("Could not set status of %s, err: %s", conntrackTimestampFlag, err.Error())
 		return
 	}
 
