@@ -64,7 +64,7 @@ func main() {
 
 	workloadLabels := strings.Split(*workloadLabelsString, ",")
 	conntrack := collector.NewConntrack(*protocol)
-	collector := collector.New(engine, conntrack, workloadLabels)
+	collector := collector.New(engine, conntrack, workloadLabels, nil)
 	prometheus.MustRegister(collector)
 	log.Printf("HTTP server listening at %s...\n", *addr)
 	log.Fatal(http.ListenAndServe(*addr, nil))

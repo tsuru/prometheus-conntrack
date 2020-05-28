@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	additionalLabels    = []string{"state", "protocol", "destination", "direction"}
+	additionalLabels    = []string{"state", "protocol", "destination", "destination_name", "direction"}
 	unusedConnectionTTL = 2 * time.Minute
 	desc                = prometheus.NewDesc("container_connections", "Number of outbound connections by destination and state", []string{"id", "name"}, nil)
 )
@@ -30,11 +30,20 @@ var (
 
 type Conntrack func() ([]*Conn, error)
 
+type destination struct {
+	ip   string
+	port string
+}
+
+func (d *destination) String() string {
+	return d.ip + ":" + d.port
+}
+
 type accumulatorKey struct {
 	workload    string
 	state       string
 	protocol    string
-	destination string
+	destination destination
 	direction   ConnDirection
 }
 
@@ -46,13 +55,13 @@ type ConntrackCollector struct {
 	metricTupleSize         int
 	fetchWorkloads          prometheus.Counter
 	fetchWorkloadFailures   prometheus.Counter
-
+	dnsCache                DNSCache
 	// lastUsedTuples works such as a TTL, prometheus needs to know when connection is closed
 	// then we will inform metric with 0 value for a while
 	lastUsedTuples sync.Map
 }
 
-func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string) *ConntrackCollector {
+func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, dnsCache DNSCache) *ConntrackCollector {
 	sanitizedWorkloadLabels := []string{engine.Kind()}
 	for _, workloadLabel := range workloadLabels {
 		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, "label_"+promstrutil.SanitizeLabelName(workloadLabel))
@@ -61,12 +70,17 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string) *
 		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, label)
 	}
 
+	if dnsCache == nil {
+		dnsCache = newDNSCache()
+	}
+
 	collector := &ConntrackCollector{
 		engine:                  engine,
 		conntrack:               conntrack,
 		workloadLabels:          workloadLabels,
 		sanitizedWorkloadLabels: sanitizedWorkloadLabels,
 		metricTupleSize:         1 + len(workloadLabels) + len(additionalLabels),
+		dnsCache:                dnsCache,
 		fetchWorkloads: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: "conntrack",
 			Subsystem: "workload",
@@ -110,26 +124,27 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 	workloadMap := map[string]*workload.Workload{}
 	for _, workload := range workloads {
 		for _, conn := range conns {
-			destination := ""
+			var d destination
 			var direction ConnDirection
 			switch workload.IP {
 			case conn.OriginIP:
-				destination = conn.ReplyIP + ":" + conn.ReplyPort
+				d = destination{conn.ReplyIP, conn.ReplyPort}
 				direction = OutcommingConnection
 			case conn.ReplyIP:
-				destination = ":" + conn.ReplyPort
+				d = destination{"", conn.ReplyPort}
 				direction = IncommingConnection
+			default:
+				continue
 			}
-			if destination != "" {
-				key := accumulatorKey{
-					workload:    workload.Name,
-					protocol:    conn.Protocol,
-					state:       conn.State,
-					destination: destination,
-					direction:   direction,
-				}
-				counts[key] = counts[key] + 1
+
+			key := accumulatorKey{
+				workload:    workload.Name,
+				protocol:    conn.Protocol,
+				state:       conn.State,
+				destination: d,
+				direction:   direction,
 			}
+			counts[key] = counts[key] + 1
 		}
 
 		workloadMap[workload.Name] = workload
@@ -179,8 +194,11 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 		desc := prometheus.NewDesc("conntrack_workload_connections", "Number of outbound connections by destination and state", c.sanitizedWorkloadLabels, nil)
 		values[i] = accumulator.state
 		values[i+1] = accumulator.protocol
-		values[i+2] = accumulator.destination
-		values[i+3] = string(accumulator.direction)
+		values[i+2] = accumulator.destination.String()
+		if accumulator.destination.ip != "" {
+			values[i+3] = c.dnsCache.ResolveIP(accumulator.destination.ip)
+		}
+		values[i+4] = string(accumulator.direction)
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(count), values...)
 		return true
 	})
