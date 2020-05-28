@@ -82,7 +82,7 @@ func extractPROTOAndState(entry *ct.Con, synSentDeadline time.Time) (proto, stat
 	}
 
 	if *entry.Origin.Proto.Number == IPPROTO_UDP {
-		return "UDP", "CONNECTED"
+		return "UDP", "OPEN"
 	}
 
 	return "", ""

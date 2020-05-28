@@ -60,7 +60,7 @@ func TestConvertContrackEntryToConn(t *testing.T) {
 	assert.Equal(t, []*Conn{
 		{OriginIP: "192.0.2.1", ReplyIP: "192.0.2.2", State: "ESTABLISHED", Protocol: "TCP", OriginPort: "8080", ReplyPort: "8081"},
 		{OriginIP: "192.0.2.1", ReplyIP: "192.0.2.3", State: "SYN-SENT", Protocol: "TCP", OriginPort: "8080", ReplyPort: "8081"},
-		{OriginIP: "192.0.2.50", ReplyIP: "192.0.2.51", State: "CONNECTED", Protocol: "UDP", OriginPort: "8080", ReplyPort: "8081"},
+		{OriginIP: "192.0.2.50", ReplyIP: "192.0.2.51", State: "OPEN", Protocol: "UDP", OriginPort: "8080", ReplyPort: "8081"},
 	}, conns)
 }
 
