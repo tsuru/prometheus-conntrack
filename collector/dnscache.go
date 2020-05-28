@@ -18,7 +18,7 @@ var (
 
 	dnsErrorTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "conntrack_dns_error_total",
-		Help: "The number of hits on cache of DNS",
+		Help: "The number of errors to call DNS",
 	})
 )
 
