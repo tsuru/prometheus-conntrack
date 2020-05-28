@@ -1,8 +1,8 @@
 package collector
 
 import (
-	"log"
 	"net"
+	"strings"
 	"time"
 
 	cache "github.com/patrickmn/go-cache"
@@ -44,21 +44,13 @@ func (d *dnsCache) ResolveIP(ip string) string {
 	cacheCallsTotal.WithLabelValues("miss").Inc()
 
 	names, err := net.LookupAddr(ip)
-	if dnsError, ok := err.(*net.DNSError); ok {
-		if dnsError.Err == "Name or service not known" {
-			d.c.Set(ip, "", cache.DefaultExpiration)
-			return ""
-		}
-	}
 	if err != nil {
 		dnsErrorTotal.Inc()
-		log.Printf("Could not resolve %s addr, err: %s", ip, err.Error())
-		return ""
 	}
 
 	name := ""
 	if len(names) > 0 {
-		name = names[0]
+		name = strings.TrimRight(names[0], ".")
 	}
 
 	d.c.Set(ip, name, cache.DefaultExpiration)
