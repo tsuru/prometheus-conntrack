@@ -24,8 +24,8 @@ var (
 type ConnDirection string
 
 var (
-	OutcommingConnection = ConnDirection("outcomming")
-	IncommingConnection  = ConnDirection("incomming")
+	OutgoingConnection = ConnDirection("outgoing")
+	IncomingConnection = ConnDirection("incoming")
 )
 
 type Conntrack func() ([]*Conn, error)
@@ -129,10 +129,10 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			switch workload.IP {
 			case conn.OriginIP:
 				d = destination{conn.ReplyIP, conn.ReplyPort}
-				direction = OutcommingConnection
+				direction = OutgoingConnection
 			case conn.ReplyIP:
 				d = destination{"", conn.ReplyPort}
-				direction = IncommingConnection
+				direction = IncomingConnection
 			default:
 				continue
 			}
