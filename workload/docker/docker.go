@@ -40,9 +40,13 @@ func (d *dockerContainerEngine) Workloads() ([]*workload.Workload, error) {
 		if err != nil {
 			return nil, err
 		}
+		if container.Config == nil {
+			continue
+		}
 		workloads = append(workloads, &workload.Workload{
-			Name: container.Name,
-			IP:   container.NetworkSettings.IPAddress,
+			Name:   container.Name,
+			IP:     container.NetworkSettings.IPAddress,
+			Labels: container.Config.Labels,
 		})
 	}
 	return workloads, nil

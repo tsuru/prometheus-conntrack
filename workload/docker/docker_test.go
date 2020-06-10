@@ -21,6 +21,9 @@ func createContainer(t *testing.T, url, name string) string {
 	config := docker.Config{
 		Image: "myimg",
 		Cmd:   []string{"mycmd"},
+		Labels: map[string]string{
+			"app-name": "my-app",
+		},
 	}
 	opts := docker.CreateContainerOptions{Name: name, Config: &config}
 	cont, err := dockerClient.CreateContainer(opts)
@@ -41,4 +44,5 @@ func TestListWorkloads(t *testing.T) {
 	assert.Len(t, workloads, 1)
 	assert.Equal(t, "my-container", workloads[0].Name)
 	assert.Equal(t, "172.16.42.53", workloads[0].IP)
+	assert.Equal(t, map[string]string{"app-name": "my-app"}, workloads[0].Labels)
 }
