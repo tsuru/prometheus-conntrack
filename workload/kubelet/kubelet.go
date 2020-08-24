@@ -93,6 +93,8 @@ type Opts struct {
 	Key      string
 	Cert     string
 	CA       string
+
+	InsecureSkipVerify bool
 }
 
 func NewEngine(opts Opts) (workload.Engine, error) {
@@ -116,6 +118,8 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			RootCAs:      caCertPool,
+
+			InsecureSkipVerify: opts.InsecureSkipVerify,
 		}
 		tlsConfig.BuildNameToCertificate()
 		transport := &http.Transport{TLSClientConfig: tlsConfig}
