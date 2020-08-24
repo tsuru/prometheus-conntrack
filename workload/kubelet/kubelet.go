@@ -42,7 +42,8 @@ type podStatus struct {
 type kubeletEngine struct {
 	Opts
 
-	client *http.Client
+	client       *http.Client
+	tokenContent string
 }
 
 func (d *kubeletEngine) Name() string {
@@ -57,8 +58,8 @@ func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 	workloads := []*workload.Workload{}
 
 	req, _ := http.NewRequest(http.MethodGet, k.Endpoint, nil)
-	if k.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+k.Token)
+	if k.tokenContent != "" {
+		req.Header.Set("Authorization", "Bearer "+k.tokenContent)
 	}
 	response, err := k.client.Do(req)
 	if err != nil {
@@ -108,6 +109,14 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 		InsecureSkipVerify: opts.InsecureSkipVerify,
 	}
 
+	var tokenContent string
+	if opts.Token != "" {
+		tokenBytes, err := ioutil.ReadFile(opts.Token)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not read Token file")
+		}
+		tokenContent = string(tokenBytes)
+	}
 	if opts.CA != "" {
 		caCert, err := ioutil.ReadFile(opts.CA)
 		if err != nil {
@@ -133,5 +142,5 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	client := &http.Client{Transport: transport}
 
-	return &kubeletEngine{Opts: opts, client: client}, nil
+	return &kubeletEngine{Opts: opts, client: client, tokenContent: tokenContent}, nil
 }
