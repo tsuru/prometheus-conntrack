@@ -1,0 +1,55 @@
+---
+# Source: tsuru-prometheus/templates/conntrack-daemonset.yaml
+
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  generation: 10
+  labels:
+    app: prometheus-conntrack
+  name: prometheus-conntrack
+spec:
+  revisionHistoryLimit: 5
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: '30%'
+  selector:
+    matchLabels:
+      k8s-app: prometheus-conntrack
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+      labels:
+        k8s-app: prometheus-conntrack
+    spec:
+      serviceAccountName: prometheus-conntrack
+      containers:
+      - name: prometheus-conntrack
+        image: tsuru/prometheus-conntrack:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        args:
+          - '-engine'
+          - 'kubelet'
+          - '-listen-address'
+          - ':9127'
+          - '-kubelet-ca'
+          - '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
+          - '-kubelet-token'
+          - '/var/run/secrets/kubernetes.io/serviceaccount/token'
+          - '-workload-labels'
+          - 'tsuru.io/app-name,tsuru.io/app-process,version'
+          - '-insecure-skip-tls-verify=true'
+          - '-track-syn-sent=true'
+        ports:
+          - name: http-metrics
+            hostPort: 9127
+            containerPort:  9127
+            protocol: TCP
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
