@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -62,7 +63,7 @@ func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, errors.New("Invalid response code")
+		return nil, fmt.Errorf("Invalid response code: %d", response.StatusCode)
 	}
 
 	list := &podList{}
@@ -98,14 +99,12 @@ type Opts struct {
 }
 
 func NewEngine(opts Opts) (workload.Engine, error) {
-	engine := &kubeletEngine{Opts: opts, client: http.DefaultClient}
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: opts.InsecureSkipVerify,
+	}
 
-	if opts.Key != "" && opts.Cert != "" {
-		cert, err := tls.LoadX509KeyPair(opts.Cert, opts.Key)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not read cert and key file")
-		}
-
+	if opts.CA != "" {
 		caCert, err := ioutil.ReadFile(opts.CA)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not read CA file")
@@ -113,18 +112,22 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 
 		caCertPool := x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
-
-		// Setup HTTPS client
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			RootCAs:      caCertPool,
-
-			InsecureSkipVerify: opts.InsecureSkipVerify,
-		}
-		tlsConfig.BuildNameToCertificate()
-		transport := &http.Transport{TLSClientConfig: tlsConfig}
-		engine.client = &http.Client{Transport: transport}
+		tlsConfig.RootCAs = caCertPool
 	}
 
-	return engine, nil
+	if opts.Key != "" && opts.Cert != "" {
+		cert, err := tls.LoadX509KeyPair(opts.Cert, opts.Key)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not read cert and key file")
+		}
+
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	tlsConfig.BuildNameToCertificate()
+
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+	client := &http.Client{Transport: transport}
+
+	return &kubeletEngine{Opts: opts, client: client}, nil
 }
