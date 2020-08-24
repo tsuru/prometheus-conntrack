@@ -35,6 +35,7 @@ func main() {
 	kubeletKey := flag.String("kubelet-key", "", "Path to a key to authenticate on kubelet.")
 	kubeletCert := flag.String("kubelet-cert", "", "Path to a certificate to authenticate on kubelet.")
 	kubeletCA := flag.String("kubelet-ca", "", "Path to a CA to authenticate on kubelet.")
+	kubeletToken := flag.String("kubelet-token", "", "Path the token to authenticate on kubelet.")
 	insecureSkipTLSVerify := flag.Bool("insecure-skip-tls-verify", false, "controls whether a client verifies the server's certificate chain and host name.")
 
 	flag.Parse()
@@ -54,6 +55,7 @@ func main() {
 			Key:      *kubeletKey,
 			Cert:     *kubeletCert,
 			CA:       *kubeletCA,
+			Token:    *kubeletToken,
 
 			InsecureSkipVerify: *insecureSkipTLSVerify,
 		})

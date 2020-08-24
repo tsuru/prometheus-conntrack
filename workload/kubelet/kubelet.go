@@ -57,6 +57,9 @@ func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 	workloads := []*workload.Workload{}
 
 	req, _ := http.NewRequest(http.MethodGet, k.Endpoint, nil)
+	if k.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+k.Token)
+	}
 	response, err := k.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -94,6 +97,7 @@ type Opts struct {
 	Key      string
 	Cert     string
 	CA       string
+	Token    string
 
 	InsecureSkipVerify bool
 }
