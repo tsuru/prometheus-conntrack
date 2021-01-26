@@ -128,10 +128,10 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			var direction ConnDirection
 			switch workload.IP {
 			case conn.OriginIP:
-				d = destination{conn.ReplyIP, conn.ReplyPort}
+				d = destination{conn.DestIP, conn.DestPort}
 				direction = OutgoingConnection
-			case conn.ReplyIP:
-				d = destination{"", conn.ReplyPort}
+			case conn.DestIP:
+				d = destination{"", conn.DestPort}
 				direction = IncomingConnection
 			default:
 				continue
