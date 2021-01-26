@@ -27,9 +27,9 @@ var syncSentToleration = time.Second * 10
 
 type Conn struct {
 	OriginIP   string
-	ReplyIP    string
+	DestIP     string
 	OriginPort string
-	ReplyPort  string
+	DestPort   string
 	State      string
 	Protocol   string
 }
@@ -60,8 +60,8 @@ func convertContrackEntryToConn(entries []ct.Con) []*Conn {
 		conns = append(conns, &Conn{
 			OriginIP:   entry.Origin.Src.String(),
 			OriginPort: port(entry.Origin.Proto.SrcPort),
-			ReplyIP:    entry.Reply.Src.String(),
-			ReplyPort:  port(entry.Reply.Proto.SrcPort),
+			DestIP:     entry.Origin.Dst.String(),
+			DestPort:   port(entry.Origin.Proto.DstPort),
 			State:      state,
 			Protocol:   proto,
 		})

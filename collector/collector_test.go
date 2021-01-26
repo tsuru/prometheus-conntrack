@@ -48,14 +48,14 @@ func TestCollector(t *testing.T) {
 	conntrack := &fakeConntrack{
 		conns: [][]*Conn{
 			{
-				{OriginIP: "10.100.1.2", OriginPort: "33404", ReplyIP: "192.165.50.4", ReplyPort: "443", State: "ESTABLISHED", Protocol: "tcp"},
-				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-				{OriginIP: "192.168.50.5", OriginPort: "33404", ReplyIP: "10.10.1.2", ReplyPort: "7070", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.100.1.2", OriginPort: "33404", DestIP: "192.165.50.4", DestPort: "443", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.5", DestPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "192.168.50.5", OriginPort: "33404", DestIP: "10.10.1.2", DestPort: "7070", State: "ESTABLISHED", Protocol: "tcp"},
 			},
 			{
-				{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+				{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
 			},
 		},
 	}
@@ -109,18 +109,18 @@ func TestPerformMetricClean(t *testing.T) {
 
 func BenchmarkCollector(b *testing.B) {
 	conns := []*Conn{
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.6", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.7", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.6", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.3", OriginPort: "33404", ReplyIP: "192.168.50.5", ReplyPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.2", OriginPort: "33404", ReplyIP: "192.168.50.4", ReplyPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
-		{OriginIP: "10.10.1.1", OriginPort: "33404", ReplyIP: "192.168.50.6", ReplyPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.6", DestPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.7", DestPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.6", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.5", DestPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.3", OriginPort: "33404", DestIP: "192.168.50.5", DestPort: "2375", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.2", OriginPort: "33404", DestIP: "192.168.50.4", DestPort: "2374", State: "ESTABLISHED", Protocol: "tcp"},
+		{OriginIP: "10.10.1.1", OriginPort: "33404", DestIP: "192.168.50.6", DestPort: "2376", State: "ESTABLISHED", Protocol: "tcp"},
 	}
 
 	conntrack := func() ([]*Conn, error) {
