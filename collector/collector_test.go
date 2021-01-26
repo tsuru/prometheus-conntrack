@@ -136,10 +136,6 @@ func BenchmarkCollector(b *testing.B) {
 		&fakeDNSCache{},
 	)
 	ch := make(chan prometheus.Metric)
-	go func() {
-		for _ = range ch {
-		}
-	}()
 	for n := 0; n < b.N; n++ {
 		collector.Collect(ch)
 	}

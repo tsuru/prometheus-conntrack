@@ -66,9 +66,8 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 	for _, workloadLabel := range workloadLabels {
 		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, "label_"+promstrutil.SanitizeLabelName(workloadLabel))
 	}
-	for _, label := range additionalLabels {
-		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, label)
-	}
+
+	sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, additionalLabels...)
 
 	if dnsCache == nil {
 		dnsCache = newDNSCache()
