@@ -16,7 +16,7 @@ import (
 
 func TestListWorkloads(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(&podList{
+		err := json.NewEncoder(w).Encode(&podList{
 			Items: []pod{
 				{
 					Metadata: podMetadata{
@@ -47,6 +47,7 @@ func TestListWorkloads(t *testing.T) {
 				},
 			},
 		})
+		require.NoError(t, err)
 	}))
 	defer ts.Close()
 
