@@ -82,6 +82,9 @@ func (k *kubeletEngine) Workloads() ([]*workload.Workload, error) {
 		if pod.Spec.HostNetwork {
 			continue
 		}
+		if pod.Metadata.Labels == nil {
+			pod.Metadata.Labels = map[string]string{}
+		}
 		pod.Metadata.Labels["pod_namespace"] = pod.Metadata.Namespace
 		workloads = append(workloads, &workload.Workload{
 			Name:   pod.Metadata.Name,
