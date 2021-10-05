@@ -182,6 +182,9 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 		accumulator := key.(accumulatorKey)
 		count := counts[accumulator]
 		workload := workloads[accumulator.workload]
+		if workload == nil {
+			return true
+		}
 		values := make([]string, c.metricTupleSize)
 
 		values[0] = workload.Name
