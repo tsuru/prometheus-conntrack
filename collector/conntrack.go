@@ -17,6 +17,8 @@ var (
 	TCP_CONNTRACK_SYN_SENT    uint8 = 1
 	TCP_CONNTRACK_ESTABLISHED uint8 = 3
 	TCP_CONNTRACK_CLOSE_WAIT  uint8 = 5
+	TCP_CONNTRACK_LAST_ACK    uint8 = 6
+	TCP_CONNTRACK_TIME_WAIT   uint8 = 7
 
 	// copied from: https://github.com/torvalds/linux/blob/0d81a3f29c0afb18ba2b1275dcccf21e0dd4da38/include/uapi/linux/in.h#L28
 	IPPROTO_TCP uint8 = 6
@@ -73,6 +75,12 @@ func extractPROTOAndState(entry *ct.Con, synSentDeadline time.Time) (proto, stat
 	if *entry.Origin.Proto.Number == IPPROTO_TCP && entry.ProtoInfo != nil && entry.ProtoInfo.TCP != nil {
 		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_ESTABLISHED {
 			return "TCP", "ESTABLISHED"
+		}
+		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_CLOSE_WAIT {
+			return "TCP", "CLOSE-WAIT"
+		}
+		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_TIME_WAIT {
+			return "TCP", "TIME-WAIT"
 		}
 		if *entry.ProtoInfo.TCP.State == TCP_CONNTRACK_SYN_SENT && entry.Timestamp != nil && entry.Timestamp.Start.Before(synSentDeadline) {
 			return "TCP", "SYN-SENT"

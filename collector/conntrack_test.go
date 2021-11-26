@@ -42,11 +42,11 @@ func TestConvertContrackEntryToConn(t *testing.T) {
 		},
 		{
 			Origin: &ct.IPTuple{
-				Src: parseIP("192.0.2.1"), Proto: &ct.ProtoTuple{Number: &IPPROTO_TCP},
+				Src: parseIP("192.0.2.1"), Proto: &ct.ProtoTuple{Number: &IPPROTO_TCP, SrcPort: portPtr(8080), DstPort: portPtr(8081)},
 				Dst: parseIP("192.0.2.2"),
 			},
 			Reply: &ct.IPTuple{
-				Src: parseIP("192.0.2.2"), Proto: &ct.ProtoTuple{Number: &IPPROTO_TCP},
+				Src: parseIP("192.0.2.2"), Proto: &ct.ProtoTuple{Number: &IPPROTO_TCP, SrcPort: portPtr(8081)},
 				Dst: parseIP("192.0.2.1"),
 			},
 			ProtoInfo: &ct.ProtoInfo{TCP: &ct.TCPInfo{State: &TCP_CONNTRACK_CLOSE_WAIT}},
@@ -111,6 +111,7 @@ func TestConvertContrackEntryToConn(t *testing.T) {
 	conns := convertContrackEntryToConn(ctConn)
 
 	assert.Equal(t, []*Conn{
+		{OriginIP: "192.0.2.1", DestIP: "192.0.2.2", State: "CLOSE-WAIT", Protocol: "TCP", OriginPort: "8080", DestPort: "8081"},
 		{OriginIP: "192.0.2.1", DestIP: "192.0.2.2", State: "ESTABLISHED", Protocol: "TCP", OriginPort: "8080", DestPort: "8081"},
 		{OriginIP: "192.0.2.1", DestIP: "192.0.2.3", State: "SYN-SENT", Protocol: "TCP", OriginPort: "8080", DestPort: "8081"},
 		{OriginIP: "192.0.2.50", DestIP: "192.0.2.51", State: "OPEN", Protocol: "UDP", OriginPort: "8080", DestPort: "8081"},
