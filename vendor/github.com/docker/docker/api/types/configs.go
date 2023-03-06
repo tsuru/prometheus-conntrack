@@ -1,8 +1,9 @@
-package types
+package types // import "github.com/docker/docker/api/types"
 
 import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // configs holds structs used for internal communication between the
@@ -15,6 +16,7 @@ type ContainerCreateConfig struct {
 	Config           *container.Config
 	HostConfig       *container.HostConfig
 	NetworkingConfig *network.NetworkingConfig
+	Platform         *specs.Platform
 	AdjustCPUShares  bool
 }
 
@@ -25,42 +27,41 @@ type ContainerRmConfig struct {
 	ForceRemove, RemoveVolume, RemoveLink bool
 }
 
-// ContainerCommitConfig contains build configs for commit operation,
-// and is used when making a commit with the current state of the container.
-type ContainerCommitConfig struct {
-	Pause   bool
-	Repo    string
-	Tag     string
-	Author  string
-	Comment string
-	// merge container config into commit config before commit
-	MergeConfigs bool
-	Config       *container.Config
-}
-
 // ExecConfig is a small subset of the Config struct that holds the configuration
 // for the exec feature of docker.
 type ExecConfig struct {
 	User         string   // User that will run the command
 	Privileged   bool     // Is the container in privileged mode
 	Tty          bool     // Attach standard streams to a tty.
+	ConsoleSize  *[2]uint `json:",omitempty"` // Initial console size [height, width]
 	AttachStdin  bool     // Attach the standard input, makes possible user interaction
 	AttachStderr bool     // Attach the standard error
 	AttachStdout bool     // Attach the standard output
 	Detach       bool     // Execute in detach mode
 	DetachKeys   string   // Escape keys for detach
 	Env          []string // Environment variables
+	WorkingDir   string   // Working directory
 	Cmd          []string // Execution commands and args
 }
 
-// PluginRmConfig holds arguments for the plugin remove
-// operation. This struct is used to tell the backend what operations
-// to perform.
+// PluginRmConfig holds arguments for plugin remove.
 type PluginRmConfig struct {
 	ForceRemove bool
 }
 
-// PluginEnableConfig holds arguments for the plugin enable
+// PluginEnableConfig holds arguments for plugin enable
 type PluginEnableConfig struct {
 	Timeout int
+}
+
+// PluginDisableConfig holds arguments for plugin disable.
+type PluginDisableConfig struct {
+	ForceDisable bool
+}
+
+// NetworkListConfig stores the options available for listing networks
+type NetworkListConfig struct {
+	// TODO(@cpuguy83): naming is hard, this is pulled from what was being used in the router before moving here
+	Detailed bool
+	Verbose  bool
 }
