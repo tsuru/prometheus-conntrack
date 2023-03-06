@@ -1,15 +1,18 @@
-package opts
+package opts // import "github.com/docker/docker/opts"
 
 import (
-	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/docker/docker/pkg/homedir"
+	"github.com/pkg/errors"
 )
 
-var (
-	// DefaultHTTPPort Default HTTP Port used if only the protocol is provided to -H flag e.g. docker daemon -H tcp://
+const (
+	// DefaultHTTPPort Default HTTP Port used if only the protocol is provided to -H flag e.g. dockerd -H tcp://
 	// These are the IANA registered port numbers for use with Docker
 	// see http://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?search=docker
 	DefaultHTTPPort = 2375 // Default HTTP Port
@@ -19,40 +22,52 @@ var (
 	// Docker daemon by default always listens on the default unix socket
 	DefaultUnixSocket = "/var/run/docker.sock"
 	// DefaultTCPHost constant defines the default host string used by docker on Windows
-	DefaultTCPHost = fmt.Sprintf("tcp://%s:%d", DefaultHTTPHost, DefaultHTTPPort)
+	DefaultTCPHost = "tcp://" + DefaultHTTPHost + ":2375"
 	// DefaultTLSHost constant defines the default host string used by docker for TLS sockets
-	DefaultTLSHost = fmt.Sprintf("tcp://%s:%d", DefaultHTTPHost, DefaultTLSHTTPPort)
+	DefaultTLSHost = "tcp://" + DefaultHTTPHost + ":2376"
 	// DefaultNamedPipe defines the default named pipe used by docker on Windows
 	DefaultNamedPipe = `//./pipe/docker_engine`
+	// HostGatewayName is the string value that can be passed
+	// to the IPAddr section in --add-host that is replaced by
+	// the value of HostGatewayIP daemon config value
+	HostGatewayName = "host-gateway"
 )
 
 // ValidateHost validates that the specified string is a valid host and returns it.
 func ValidateHost(val string) (string, error) {
 	host := strings.TrimSpace(val)
-	// The empty string means default and is not handled by parseDockerDaemonHost
+	// The empty string means default and is not handled by parseDaemonHost
 	if host != "" {
-		_, err := parseDockerDaemonHost(host)
+		_, err := parseDaemonHost(host)
 		if err != nil {
 			return val, err
 		}
 	}
 	// Note: unlike most flag validators, we don't return the mutated value here
-	//       we need to know what the user entered later (using ParseHost) to adjust for tls
+	//       we need to know what the user entered later (using ParseHost) to adjust for TLS
 	return val, nil
 }
 
-// ParseHost and set defaults for a Daemon host string
-func ParseHost(defaultToTLS bool, val string) (string, error) {
+// ParseHost and set defaults for a Daemon host string.
+// defaultToTLS is preferred over defaultToUnixXDG.
+func ParseHost(defaultToTLS, defaultToUnixXDG bool, val string) (string, error) {
 	host := strings.TrimSpace(val)
 	if host == "" {
 		if defaultToTLS {
 			host = DefaultTLSHost
+		} else if defaultToUnixXDG {
+			runtimeDir, err := homedir.GetRuntimeDir()
+			if err != nil {
+				return "", err
+			}
+			socket := filepath.Join(runtimeDir, "docker.sock")
+			host = "unix://" + socket
 		} else {
 			host = DefaultHost
 		}
 	} else {
 		var err error
-		host, err = parseDockerDaemonHost(host)
+		host, err = parseDaemonHost(host)
 		if err != nil {
 			return val, err
 		}
@@ -60,9 +75,9 @@ func ParseHost(defaultToTLS bool, val string) (string, error) {
 	return host, nil
 }
 
-// parseDockerDaemonHost parses the specified address and returns an address that will be used as the host.
-// Depending of the address specified, this may return one of the global Default* strings defined in hosts.go.
-func parseDockerDaemonHost(addr string) (string, error) {
+// parseDaemonHost parses the specified address and returns an address that will be used as the host.
+// Depending on the address specified, this may return one of the global Default* strings defined in hosts.go.
+func parseDaemonHost(addr string) (string, error) {
 	addrParts := strings.SplitN(addr, "://", 2)
 	if len(addrParts) == 1 && addrParts[0] != "" {
 		addrParts = []string{"tcp", addrParts[0]}
@@ -70,7 +85,7 @@ func parseDockerDaemonHost(addr string) (string, error) {
 
 	switch addrParts[0] {
 	case "tcp":
-		return ParseTCPAddr(addrParts[1], DefaultTCPHost)
+		return ParseTCPAddr(addr, DefaultTCPHost)
 	case "unix":
 		return parseSimpleProtoAddr("unix", addrParts[1], DefaultUnixSocket)
 	case "npipe":
@@ -78,7 +93,7 @@ func parseDockerDaemonHost(addr string) (string, error) {
 	case "fd":
 		return addr, nil
 	default:
-		return "", fmt.Errorf("Invalid bind address format: %s", addr)
+		return "", errors.Errorf("invalid bind address (%s): unsupported proto '%s'", addr, addrParts[0])
 	}
 }
 
@@ -89,12 +104,12 @@ func parseDockerDaemonHost(addr string) (string, error) {
 func parseSimpleProtoAddr(proto, addr, defaultAddr string) (string, error) {
 	addr = strings.TrimPrefix(addr, proto+"://")
 	if strings.Contains(addr, "://") {
-		return "", fmt.Errorf("Invalid proto, expected %s: %s", proto, addr)
+		return "", errors.Errorf("invalid proto, expected %s: %s", proto, addr)
 	}
 	if addr == "" {
 		addr = defaultAddr
 	}
-	return fmt.Sprintf("%s://%s", proto, addr), nil
+	return proto + "://" + addr, nil
 }
 
 // ParseTCPAddr parses and validates that the specified address is a valid TCP
@@ -103,49 +118,69 @@ func parseSimpleProtoAddr(proto, addr, defaultAddr string) (string, error) {
 // tryAddr is expected to have already been Trim()'d
 // defaultAddr must be in the full `tcp://host:port` form
 func ParseTCPAddr(tryAddr string, defaultAddr string) (string, error) {
-	if tryAddr == "" || tryAddr == "tcp://" {
-		return defaultAddr, nil
-	}
-	addr := strings.TrimPrefix(tryAddr, "tcp://")
-	if strings.Contains(addr, "://") || addr == "" {
-		return "", fmt.Errorf("Invalid proto, expected tcp: %s", tryAddr)
+	def, err := parseTCPAddr(defaultAddr, true)
+	if err != nil {
+		return "", errors.Wrapf(err, "invalid default address (%s)", defaultAddr)
 	}
 
-	defaultAddr = strings.TrimPrefix(defaultAddr, "tcp://")
-	defaultHost, defaultPort, err := net.SplitHostPort(defaultAddr)
+	addr, err := parseTCPAddr(tryAddr, false)
 	if err != nil {
-		return "", err
-	}
-	// url.Parse fails for trailing colon on IPv6 brackets on Go 1.5, but
-	// not 1.4. See https://github.com/golang/go/issues/12200 and
-	// https://github.com/golang/go/issues/6530.
-	if strings.HasSuffix(addr, "]:") {
-		addr += defaultPort
+		return "", errors.Wrapf(err, "invalid bind address (%s)", tryAddr)
 	}
 
-	u, err := url.Parse("tcp://" + addr)
-	if err != nil {
-		return "", err
-	}
-	host, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		// try port addition once
-		host, port, err = net.SplitHostPort(net.JoinHostPort(u.Host, defaultPort))
-	}
-	if err != nil {
-		return "", fmt.Errorf("Invalid bind address format: %s", tryAddr)
-	}
-
+	host := addr.Hostname()
 	if host == "" {
-		host = defaultHost
+		host = def.Hostname()
 	}
+	port := addr.Port()
 	if port == "" {
-		port = defaultPort
-	}
-	p, err := strconv.Atoi(port)
-	if err != nil && p == 0 {
-		return "", fmt.Errorf("Invalid bind address format: %s", tryAddr)
+		port = def.Port()
 	}
 
-	return fmt.Sprintf("tcp://%s%s", net.JoinHostPort(host, port), u.Path), nil
+	return "tcp://" + net.JoinHostPort(host, port), nil
+}
+
+// parseTCPAddr parses the given addr and validates if it is in the expected
+// format. If strict is enabled, the address must contain a scheme (tcp://),
+// a host (or IP-address) and a port number.
+func parseTCPAddr(address string, strict bool) (*url.URL, error) {
+	if !strict && !strings.Contains(address, "://") {
+		address = "tcp://" + address
+	}
+	parsedURL, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	if parsedURL.Scheme != "tcp" {
+		return nil, errors.Errorf("unsupported proto '%s'", parsedURL.Scheme)
+	}
+	if parsedURL.Path != "" {
+		return nil, errors.New("should not contain a path element")
+	}
+	if strict && parsedURL.Host == "" {
+		return nil, errors.New("no host or IP address")
+	}
+	if parsedURL.Port() != "" || strict {
+		if p, err := strconv.Atoi(parsedURL.Port()); err != nil || p == 0 {
+			return nil, errors.Errorf("invalid port: %s", parsedURL.Port())
+		}
+	}
+	return parsedURL, nil
+}
+
+// ValidateExtraHost validates that the specified string is a valid extrahost and returns it.
+// ExtraHost is in the form of name:ip where the ip has to be a valid ip (IPv4 or IPv6).
+func ValidateExtraHost(val string) (string, error) {
+	// allow for IPv6 addresses in extra hosts by only splitting on first ":"
+	arr := strings.SplitN(val, ":", 2)
+	if len(arr) != 2 || len(arr[0]) == 0 {
+		return "", errors.Errorf("bad format for add-host: %q", val)
+	}
+	// Skip IPaddr validation for special "host-gateway" string
+	if arr[1] != HostGatewayName {
+		if _, err := ValidateIPAddress(arr[1]); err != nil {
+			return "", errors.Errorf("invalid IP address in add-host: %q", arr[1])
+		}
+	}
+	return val, nil
 }

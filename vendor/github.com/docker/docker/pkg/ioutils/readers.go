@@ -1,25 +1,31 @@
-package ioutils
+package ioutils // import "github.com/docker/docker/pkg/ioutils"
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
 	"io"
 
-	"golang.org/x/net/context"
+	// make sure crypto.SHA256, crypto.sha512 and crypto.SHA384 are registered
+	// TODO remove once https://github.com/opencontainers/go-digest/pull/64 is merged.
+	_ "crypto/sha256"
+	_ "crypto/sha512"
 )
 
-type readCloserWrapper struct {
+// ReadCloserWrapper wraps an io.Reader, and implements an io.ReadCloser
+// It calls the given callback function when closed. It should be constructed
+// with NewReadCloserWrapper
+type ReadCloserWrapper struct {
 	io.Reader
 	closer func() error
 }
 
-func (r *readCloserWrapper) Close() error {
+// Close calls back the passed closer function
+func (r *ReadCloserWrapper) Close() error {
 	return r.closer()
 }
 
 // NewReadCloserWrapper returns a new io.ReadCloser.
 func NewReadCloserWrapper(r io.Reader, closer func() error) io.ReadCloser {
-	return &readCloserWrapper{
+	return &ReadCloserWrapper{
 		Reader: r,
 		closer: closer,
 	}
@@ -44,15 +50,6 @@ func NewReaderErrWrapper(r io.Reader, closer func()) io.Reader {
 		reader: r,
 		closer: closer,
 	}
-}
-
-// HashData returns the sha256 sum of src.
-func HashData(src io.Reader) (string, error) {
-	h := sha256.New()
-	if _, err := io.Copy(h, src); err != nil {
-		return "", err
-	}
-	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // OnEOFReader wraps an io.ReadCloser and a function
