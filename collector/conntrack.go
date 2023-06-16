@@ -5,7 +5,6 @@
 package collector
 
 import (
-	"strconv"
 	"time"
 
 	ct "github.com/florianl/go-conntrack"
@@ -28,12 +27,15 @@ var (
 var syncSentToleration = time.Second * 10
 
 type Conn struct {
-	OriginIP   string
-	DestIP     string
-	OriginPort string
-	DestPort   string
-	State      string
-	Protocol   string
+	ID          uint32
+	OriginIP    string
+	DestIP      string
+	OriginPort  uint16
+	DestPort    uint16
+	State       string
+	Protocol    string
+	OriginBytes uint64
+	ReplyBytes  uint64
 }
 
 func conntrack(protocol string) ([]*Conn, error) {
@@ -55,17 +57,36 @@ func convertContrackEntryToConn(entries []ct.Con) []*Conn {
 	conns := []*Conn{}
 	synSentDeadline := now.Add(syncSentToleration * -1)
 	for _, entry := range entries {
+
+		var id uint32
+		if entry.ID != nil {
+			id = *entry.ID
+		}
+
+		var originBytes uint64
+		if entry.CounterOrigin != nil {
+			originBytes = *entry.CounterOrigin.Bytes
+		}
+
+		var replyBytes uint64
+		if entry.CounterReply != nil {
+			replyBytes = *entry.CounterReply.Bytes
+		}
+
 		proto, state := extractPROTOAndState(&entry, synSentDeadline)
 		if state == "" {
 			continue
 		}
 		conns = append(conns, &Conn{
-			OriginIP:   entry.Origin.Src.String(),
-			OriginPort: port(entry.Origin.Proto.SrcPort),
-			DestIP:     entry.Origin.Dst.String(),
-			DestPort:   port(entry.Origin.Proto.DstPort),
-			State:      state,
-			Protocol:   proto,
+			ID:          id,
+			OriginIP:    entry.Origin.Src.String(),
+			OriginPort:  port(entry.Origin.Proto.SrcPort),
+			DestIP:      entry.Origin.Dst.String(),
+			DestPort:    port(entry.Origin.Proto.DstPort),
+			State:       state,
+			OriginBytes: originBytes,
+			ReplyBytes:  replyBytes,
+			Protocol:    proto,
 		})
 	}
 	return conns
@@ -102,10 +123,10 @@ func NewConntrack(protocol string) Conntrack {
 	}
 }
 
-func port(p *uint16) string {
+func port(p *uint16) uint16 {
 	if p == nil {
-		return ""
+		return 0
 	}
 
-	return strconv.Itoa(int(*p))
+	return *p
 }
