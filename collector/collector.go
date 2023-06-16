@@ -352,6 +352,8 @@ func (c *ConntrackCollector) bytesLabels(workload *workload.Workload, destinatio
 	return values
 }
 
+var denyListNodeIPs = map[string]bool{"127.0.0.1": true, "::1": true}
+
 func nodeIPs() (map[string]struct{}, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -361,6 +363,9 @@ func nodeIPs() (map[string]struct{}, error) {
 	result := map[string]struct{}{}
 
 	for _, iface := range interfaces {
+		if strings.HasPrefix(iface.Name, "cali") || strings.HasPrefix(iface.Name, "docker") || iface.Name == "lo" {
+			continue
+		}
 		addrs, err := iface.Addrs()
 		if err != nil {
 			return nil, err
@@ -368,7 +373,10 @@ func nodeIPs() (map[string]struct{}, error) {
 
 		for _, addr := range addrs {
 			ip := strings.Split(addr.String(), "/")[0]
-			result[ip] = struct{}{}
+
+			if !denyListNodeIPs[ip] {
+				result[ip] = struct{}{}
+			}
 		}
 	}
 
