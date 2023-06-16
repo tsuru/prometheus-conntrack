@@ -83,6 +83,10 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 		return nil, err
 	}
 
+	for ip := range ips {
+		fmt.Println("Found node IP:", ip)
+	}
+
 	collector := &ConntrackCollector{
 		engine:                    engine,
 		conntrack:                 conntrack,
