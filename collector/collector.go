@@ -120,7 +120,9 @@ func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.workloadConnectionsDesc()
 	ch <- c.nodeConnectionsDesc()
 	ch <- c.workloadOriginBytesTotalDesc()
+	ch <- c.nodeOriginBytesTotalDesc()
 	ch <- c.workloadReplyBytesTotalDesc()
+	ch <- c.nodeReplyBytesTotalDesc()
 }
 
 func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
@@ -250,12 +252,20 @@ func (c *ConntrackCollector) workloadOriginBytesTotalDesc() *prometheus.Desc {
 	return prometheus.NewDesc("conntrack_workload_origin_bytes_total", "Number of origin bytes", labels, nil)
 }
 
+func (c *ConntrackCollector) nodeOriginBytesTotalDesc() *prometheus.Desc {
+	return prometheus.NewDesc("conntrack_node_origin_bytes_total", "Number of origin bytes", originBytesLabels, nil)
+}
+
 func (c *ConntrackCollector) workloadReplyBytesTotalDesc() *prometheus.Desc {
 	labels := []string{}
 	labels = append(labels, c.sanitizedWorkloadLabels...)
 	labels = append(labels, originBytesLabels...)
 
 	return prometheus.NewDesc("conntrack_workload_reply_bytes_total", "Number of reply bytes", labels, nil)
+}
+
+func (c *ConntrackCollector) nodeReplyBytesTotalDesc() *prometheus.Desc {
+	return prometheus.NewDesc("conntrack_node_reply_bytes_total", "Number of reply bytes", originBytesLabels, nil)
 }
 
 func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
@@ -315,7 +325,8 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 
 	trafficBytesItems := c.trafficCounter.List()
 
-	originBytesLabelDesc := c.workloadOriginBytesTotalDesc()
+	// workloads origin
+	workloadOriginBytesLabelDesc := c.workloadOriginBytesTotalDesc()
 	for _, trafficBytesItem := range trafficBytesItems {
 		workload := workloads[trafficBytesItem.Workload]
 
@@ -323,11 +334,21 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			continue
 		}
 
-		ch <- prometheus.MustNewConstMetric(originBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), c.bytesLabels(workload, trafficBytesItem.DestinationString())...)
+		ch <- prometheus.MustNewConstMetric(workloadOriginBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), c.workloadBytesLabels(workload, trafficBytesItem.DestinationString())...)
 	}
 
-	replyBytesTotalDesc := c.workloadReplyBytesTotalDesc()
+	// nodes origin
+	nodeOriginBytesLabelDesc := c.nodeOriginBytesTotalDesc()
+	for _, trafficBytesItem := range trafficBytesItems {
+		if trafficBytesItem.Workload != "" {
+			continue
+		}
 
+		ch <- prometheus.MustNewConstMetric(nodeOriginBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), trafficBytesItem.DestinationString())
+	}
+
+	// workload reply
+	replyBytesTotalDesc := c.workloadReplyBytesTotalDesc()
 	for _, trafficBytesItem := range trafficBytesItems {
 		workload := workloads[trafficBytesItem.Workload]
 
@@ -335,11 +356,21 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			continue
 		}
 
-		ch <- prometheus.MustNewConstMetric(replyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), c.bytesLabels(workload, trafficBytesItem.DestinationString())...)
+		ch <- prometheus.MustNewConstMetric(replyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), c.workloadBytesLabels(workload, trafficBytesItem.DestinationString())...)
+	}
+
+	// node reply
+	nodeReplyBytesTotalDesc := c.nodeReplyBytesTotalDesc()
+	for _, trafficBytesItem := range trafficBytesItems {
+		if trafficBytesItem.Workload != "" {
+			continue
+		}
+
+		ch <- prometheus.MustNewConstMetric(nodeReplyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), trafficBytesItem.DestinationString())
 	}
 }
 
-func (c *ConntrackCollector) bytesLabels(workload *workload.Workload, destination string) []string {
+func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, destination string) []string {
 	values := make([]string, len(c.workloadLabels)+2)
 	values[0] = workload.Name
 	i := 1
@@ -351,8 +382,6 @@ func (c *ConntrackCollector) bytesLabels(workload *workload.Workload, destinatio
 
 	return values
 }
-
-var denyListNodeIPs = map[string]bool{"127.0.0.1": true, "::1": true}
 
 func nodeIPs() (map[string]struct{}, error) {
 	interfaces, err := net.Interfaces()
@@ -374,11 +403,17 @@ func nodeIPs() (map[string]struct{}, error) {
 		for _, addr := range addrs {
 			ip := strings.Split(addr.String(), "/")[0]
 
-			if !denyListNodeIPs[ip] {
+			if !skipIp(ip) {
 				result[ip] = struct{}{}
 			}
 		}
 	}
 
 	return result, nil
+}
+
+var denyListNodeIPs = map[string]bool{"127.0.0.1": true, "::1": true}
+
+func skipIp(ip string) bool {
+	return !denyListNodeIPs[ip] && !strings.HasPrefix(ip, "169.254")
 }
