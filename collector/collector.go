@@ -231,11 +231,7 @@ func (c *ConntrackCollector) performMetricCleaner() {
 }
 
 func (c *ConntrackCollector) nodeConnectionsDesc() *prometheus.Desc {
-	labels := []string{}
-	labels = append(labels, c.sanitizedWorkloadLabels...)
-	labels = append(labels, connectionLabels...)
-
-	return prometheus.NewDesc("conntrack_node_connections", "Number of outbound node connections by destination and state", labels, nil)
+	return prometheus.NewDesc("conntrack_node_connections", "Number of outbound node connections by destination and state", connectionLabels, nil)
 }
 
 func (c *ConntrackCollector) workloadConnectionsDesc() *prometheus.Desc {
