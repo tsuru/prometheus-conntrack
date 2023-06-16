@@ -415,5 +415,5 @@ func nodeIPs() (map[string]struct{}, error) {
 var denyListNodeIPs = map[string]bool{"127.0.0.1": true, "::1": true}
 
 func skipIp(ip string) bool {
-	return !denyListNodeIPs[ip] && !strings.HasPrefix(ip, "169.254")
+	return denyListNodeIPs[ip] || strings.HasPrefix(ip, "169.254")
 }
