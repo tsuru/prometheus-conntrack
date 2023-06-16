@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -370,7 +371,8 @@ func nodeIPs() (map[string]struct{}, error) {
 		}
 
 		for _, addr := range addrs {
-			result[addr.String()] = struct{}{}
+			ip := strings.Split(addr.String(), "/")[0]
+			result[ip] = struct{}{}
 		}
 	}
 
