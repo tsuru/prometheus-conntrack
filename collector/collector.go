@@ -392,7 +392,7 @@ func nodeIPs() (map[string]struct{}, error) {
 	result := map[string]struct{}{}
 
 	for _, iface := range interfaces {
-		if strings.HasPrefix(iface.Name, "cali") || strings.HasPrefix(iface.Name, "docker") || iface.Name == "lo" {
+		if skipIface(iface.Name) {
 			continue
 		}
 		addrs, err := iface.Addrs()
@@ -416,4 +416,8 @@ var denyListNodeIPs = map[string]bool{"127.0.0.1": true, "::1": true}
 
 func skipIp(ip string) bool {
 	return denyListNodeIPs[ip] || strings.HasPrefix(ip, "169.254")
+}
+
+func skipIface(name string) bool {
+	return strings.HasPrefix(name, "cali") || strings.HasPrefix(name, "docker") || name == "lo" || name == "nodelocaldns"
 }
