@@ -60,7 +60,7 @@ func TestCollector(t *testing.T) {
 		},
 	}
 
-	collector := New(
+	collector, _ := New(
 		workloadTesting.New("containerd", "container", []*workload.Workload{
 			{Name: "my-container1", IP: "10.10.1.2", Labels: map[string]string{"label1": "val1", "app": "app1"}},
 		}),
@@ -126,7 +126,7 @@ func BenchmarkCollector(b *testing.B) {
 	conntrack := func() ([]*Conn, error) {
 		return conns, nil
 	}
-	collector := New(
+	collector, _ := New(
 		workloadTesting.New("containerd", "container", []*workload.Workload{
 			{Name: "my-container1", IP: "10.10.1.2"},
 			{Name: "my-container2", IP: "10.10.1.3"},

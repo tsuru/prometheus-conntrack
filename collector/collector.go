@@ -7,6 +7,7 @@ package collector
 import (
 	"fmt"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -58,6 +59,8 @@ type ConntrackCollector struct {
 	fetchWorkloads            prometheus.Counter
 	fetchWorkloadFailures     prometheus.Counter
 	dnsCache                  DNSCache
+
+	nodeIPs map[string]struct{}
 	// lastUsedWorkloadTuples works such as a TTL, prometheus needs to know when connection is closed
 	// then we will inform metric with 0 value for a while
 	lastUsedWorkloadTuples sync.Map
@@ -65,7 +68,7 @@ type ConntrackCollector struct {
 	trafficCounter *trafficCounter
 }
 
-func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, dnsCache DNSCache) *ConntrackCollector {
+func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, dnsCache DNSCache) (*ConntrackCollector, error) {
 	sanitizedWorkloadLabels := []string{engine.Kind()}
 	for _, workloadLabel := range workloadLabels {
 		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, "label_"+promstrutil.SanitizeLabelName(workloadLabel))
@@ -75,6 +78,11 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 		dnsCache = newDNSCache()
 	}
 
+	ips, err := nodeIPs()
+	if err != nil {
+		return nil, err
+	}
+
 	collector := &ConntrackCollector{
 		engine:                    engine,
 		conntrack:                 conntrack,
@@ -82,6 +90,7 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 		sanitizedWorkloadLabels:   sanitizedWorkloadLabels,
 		connectionMetricTupleSize: 1 + len(workloadLabels) + len(connectionLabels),
 		dnsCache:                  dnsCache,
+		nodeIPs:                   ips,
 		fetchWorkloads: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: "conntrack",
 			Subsystem: "workload",
@@ -99,11 +108,12 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 	}
 
 	go collector.metricCleaner()
-	return collector
+	return collector, nil
 }
 
 func (c *ConntrackCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.workloadConnectionsDesc()
+	ch <- c.nodeConnectionsDesc()
 	ch <- c.workloadOriginBytesTotalDesc()
 	ch <- c.workloadReplyBytesTotalDesc()
 }
@@ -160,6 +170,31 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 		workloadMap[workload.Name] = workload
 	}
 
+	for _, conn := range conns {
+		var d destination
+		var direction ConnDirection
+
+		if _, ok := c.nodeIPs[conn.OriginIP]; ok {
+			d = destination{conn.DestIP, conn.DestPort}
+			direction = OutgoingConnection
+		} else if _, ok := c.nodeIPs[conn.DestIP]; ok {
+			d = destination{"", conn.DestPort}
+			direction = IncomingConnection
+		} else {
+			continue
+		}
+
+		key := accumulatorKey{
+			protocol:    conn.Protocol,
+			state:       conn.State,
+			destination: d,
+			direction:   direction,
+		}
+		counts[key] = counts[key] + 1
+
+		c.trafficCounter.Inc(connTrafficKey{IP: d.ip, Port: d.port}, conn.ID, conn.OriginBytes, conn.ReplyBytes)
+	}
+
 	c.trafficCounter.Unlock()
 
 	now := time.Now().UTC()
@@ -190,12 +225,20 @@ func (c *ConntrackCollector) performMetricCleaner() {
 	})
 }
 
+func (c *ConntrackCollector) nodeConnectionsDesc() *prometheus.Desc {
+	labels := []string{}
+	labels = append(labels, c.sanitizedWorkloadLabels...)
+	labels = append(labels, connectionLabels...)
+
+	return prometheus.NewDesc("conntrack_node_connections", "Number of outbound node connections by destination and state", labels, nil)
+}
+
 func (c *ConntrackCollector) workloadConnectionsDesc() *prometheus.Desc {
 	labels := []string{}
 	labels = append(labels, c.sanitizedWorkloadLabels...)
 	labels = append(labels, connectionLabels...)
 
-	return prometheus.NewDesc("conntrack_workload_connections", "Number of outbound connections by destination and state", labels, nil)
+	return prometheus.NewDesc("conntrack_workload_connections", "Number of outbound worload connections by destination and state", labels, nil)
 }
 
 func (c *ConntrackCollector) workloadOriginBytesTotalDesc() *prometheus.Desc {
@@ -216,6 +259,8 @@ func (c *ConntrackCollector) workloadReplyBytesTotalDesc() *prometheus.Desc {
 
 func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
 	workloadConnectionsDesc := c.workloadConnectionsDesc()
+	nodeConnectionsDesc := c.nodeConnectionsDesc()
+
 	c.lastUsedWorkloadTuples.Range(func(key, _ interface{}) bool {
 		accumulator := key.(accumulatorKey)
 		count := counts[accumulator]
@@ -239,6 +284,28 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 		}
 		values[i+4] = string(accumulator.direction)
 		ch <- prometheus.MustNewConstMetric(workloadConnectionsDesc, prometheus.GaugeValue, float64(count), values...)
+		return true
+	})
+
+	c.lastUsedWorkloadTuples.Range(func(key, _ interface{}) bool {
+		accumulator := key.(accumulatorKey)
+		count := counts[accumulator]
+		if accumulator.workload != "" {
+			return true
+		}
+
+		values := []string{
+			accumulator.state,
+			accumulator.protocol,
+			accumulator.destination.String(),
+			"",
+			string(accumulator.direction),
+		}
+
+		if accumulator.destination.ip != "" {
+			values[3] = c.dnsCache.ResolveIP(accumulator.destination.ip)
+		}
+		ch <- prometheus.MustNewConstMetric(nodeConnectionsDesc, prometheus.GaugeValue, float64(count), values...)
 		return true
 	})
 
@@ -282,4 +349,26 @@ func (c *ConntrackCollector) bytesLabels(workload *workload.Workload, destinatio
 	values[i] = destination
 
 	return values
+}
+
+func nodeIPs() (map[string]struct{}, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]struct{}{}
+
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, addr := range addrs {
+			result[addr.String()] = struct{}{}
+		}
+	}
+
+	return result, nil
 }
