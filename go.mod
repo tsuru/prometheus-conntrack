@@ -1,6 +1,6 @@
 module github.com/tsuru/prometheus-conntrack
 
-go 1.14
+go 1.19
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20160622173216-fa152c58bc15 // indirect
