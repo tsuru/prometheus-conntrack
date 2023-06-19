@@ -53,11 +53,19 @@ func (t *trafficCounter) Inc(key connTrafficKey, id uint32, originCounter uint64
 
 	if ok {
 		diffOriginCounter := originCounter - previousConnState.OriginCounter
+
+		if diffOriginCounter > 10000000 {
+			fmt.Printf("Warning for origin counter, its increases more than %d bytes, for conn ID: %d\n", diffOriginCounter, id)
+		}
 		if diffOriginCounter > 0 {
 			v.OriginCounter += diffOriginCounter
 		}
 
 		diffReplyCounter := replyCounter - previousConnState.ReplyCounter
+
+		if diffReplyCounter > 10000000 {
+			fmt.Printf("Warning for origin counter, its increases more than %d bytes, for conn ID: %d\n", diffReplyCounter, id)
+		}
 		if diffReplyCounter > 0 {
 			v.ReplyCounter += diffReplyCounter
 		}
