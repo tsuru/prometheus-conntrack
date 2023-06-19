@@ -30,35 +30,41 @@ type trafficCounter struct {
 	sync.RWMutex
 	m map[connTrafficKey]*connTrafficValue
 
-	previousConnState map[uint32]connTrafficValue
+	previousConnState map[uint32]*connTrafficValue
 }
 
 func newTrafficCounter() *trafficCounter {
 	return &trafficCounter{
 		RWMutex:           sync.RWMutex{},
 		m:                 make(map[connTrafficKey]*connTrafficValue),
-		previousConnState: make(map[uint32]connTrafficValue),
+		previousConnState: make(map[uint32]*connTrafficValue),
 	}
 }
 
 func (t *trafficCounter) Inc(key connTrafficKey, id uint32, originCounter uint64, replyCounter uint64) {
+	// TODO: clean conn ID that was used before to avoid colision
 	v, ok := t.m[key]
 
 	if !ok {
-		v = &connTrafficValue{}
+		v = &connTrafficValue{OriginCounter: 0, ReplyCounter: 0}
 		t.m[key] = v
 	}
 
 	previousConnState, ok := t.previousConnState[id]
 
 	if ok {
-		diffOriginCounter := originCounter - previousConnState.OriginCounter
-
+		var diffOriginCounter uint64
+		if originCounter > previousConnState.OriginCounter {
+			diffOriginCounter = originCounter - previousConnState.OriginCounter
+		}
 		if diffOriginCounter > 0 {
 			v.OriginCounter += diffOriginCounter
 		}
 
-		diffReplyCounter := replyCounter - previousConnState.ReplyCounter
+		var diffReplyCounter uint64
+		if replyCounter > previousConnState.ReplyCounter {
+			diffReplyCounter = replyCounter - previousConnState.ReplyCounter
+		}
 
 		if diffReplyCounter > 0 {
 			v.ReplyCounter += diffReplyCounter
@@ -68,7 +74,7 @@ func (t *trafficCounter) Inc(key connTrafficKey, id uint32, originCounter uint64
 		v.ReplyCounter += replyCounter
 	}
 
-	t.previousConnState[id] = connTrafficValue{OriginCounter: originCounter, ReplyCounter: replyCounter}
+	t.previousConnState[id] = &connTrafficValue{OriginCounter: originCounter, ReplyCounter: replyCounter}
 }
 
 func (t *trafficCounter) List() []conntTrafficItem {

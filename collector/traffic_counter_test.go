@@ -41,3 +41,19 @@ func TestTrafficCounterTwice(t *testing.T) {
 	assert.Equal(t, int(items[0].ReplyCounter), 210)
 	assert.Equal(t, int(items[0].OriginCounter), 210)
 }
+
+func TestTrafficCounterNeverDecreasesCounter(t *testing.T) {
+
+	tc := newTrafficCounter()
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 9, 9)
+
+	items := tc.List()
+
+	assert.Len(t, items, 1)
+	assert.Equal(t, items[0].IP, "10.1.1.1")
+	assert.Equal(t, items[0].Port, uint16(8000))
+	assert.Equal(t, items[0].Direction, OutgoingConnection)
+	assert.Equal(t, int(items[0].ReplyCounter), 10)
+	assert.Equal(t, int(items[0].OriginCounter), 10)
+}
