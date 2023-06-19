@@ -171,6 +171,14 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			counts[key] = counts[key] + 1
 
+			if conn.OriginBytes > 10000000 {
+				fmt.Printf("Warning for origin bytes, have more than %d bytes, for conn ID: %d -- %#v\n", conn.OriginBytes, conn.ID, conn)
+			}
+
+			if conn.ReplyBytes > 10000000 {
+				fmt.Printf("Warning for reply bytes, have more than %d bytes, for conn ID: %d -- %#v\n", conn.ReplyBytes, conn.ID, conn)
+			}
+
 			c.trafficCounter.Inc(connTrafficKey{Workload: workload.Name, IP: d.ip, Port: d.port}, conn.ID, conn.OriginBytes, conn.ReplyBytes)
 		}
 
