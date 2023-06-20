@@ -376,7 +376,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 }
 
 func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, destination connTrafficKey) []string {
-	values := make([]string, len(c.workloadLabels)+2)
+	values := make([]string, len(c.workloadLabels)+4)
 	values[0] = workload.Name
 	i := 1
 	for _, k := range c.workloadLabels {
@@ -386,8 +386,10 @@ func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, de
 	values[i] = destination.DestinationString()
 	if destination.IP == "" {
 		values[i+1] = ""
+		values[i+2] = ""
 	} else {
-		values[i+1] = c.cidrClassifier.Classify(destination.IP)
+		values[i+1] = c.dnsCache.ResolveIP(destination.IP)
+		values[i+2] = c.cidrClassifier.Classify(destination.IP)
 	}
 
 	return values
