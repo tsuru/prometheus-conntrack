@@ -146,6 +146,7 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 	workloadMap := map[string]*workload.Workload{}
 
 	c.trafficCounter.Lock()
+	now := time.Now().UTC()
 
 	for _, workload := range workloads {
 		for _, conn := range conns {
@@ -171,7 +172,7 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			counts[key] = counts[key] + 1
 
-			c.trafficCounter.Inc(connTrafficKey{Workload: workload.Name, IP: d.ip, Port: d.port}, conn.ID, conn.OriginBytes, conn.ReplyBytes)
+			c.trafficCounter.Inc(connTrafficKey{Workload: workload.Name, IP: d.ip, Port: d.port}, conn.ID, conn.OriginBytes, conn.ReplyBytes, now)
 		}
 
 		workloadMap[workload.Name] = workload
@@ -199,12 +200,11 @@ func (c *ConntrackCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		counts[key] = counts[key] + 1
 
-		c.trafficCounter.Inc(connTrafficKey{IP: d.ip, Port: d.port}, conn.ID, conn.OriginBytes, conn.ReplyBytes)
+		c.trafficCounter.Inc(connTrafficKey{IP: d.ip, Port: d.port}, conn.ID, conn.OriginBytes, conn.ReplyBytes, now)
 	}
 
 	c.trafficCounter.Unlock()
 
-	now := time.Now().UTC()
 	for accumulatorKey := range counts {
 		c.lastUsedWorkloadTuples.Store(accumulatorKey, now)
 	}

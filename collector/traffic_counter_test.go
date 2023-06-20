@@ -6,14 +6,16 @@ package collector
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTrafficCounterOnce(t *testing.T) {
-
+	now := time.Now().UTC()
 	tc := newTrafficCounter()
-	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10, now)
 
 	items := tc.List()
 
@@ -26,11 +28,12 @@ func TestTrafficCounterOnce(t *testing.T) {
 }
 
 func TestTrafficCounterTwice(t *testing.T) {
+	now := time.Now().UTC()
 
 	tc := newTrafficCounter()
-	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10)
-	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 11, 110, 110)
-	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 100, 100)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10, now)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 11, 110, 110, now)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 100, 100, now)
 
 	items := tc.List()
 
@@ -43,10 +46,11 @@ func TestTrafficCounterTwice(t *testing.T) {
 }
 
 func TestTrafficCounterNeverDecreasesCounter(t *testing.T) {
+	now := time.Now().UTC()
 
 	tc := newTrafficCounter()
-	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10)
-	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 9, 9)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10, now)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 9, 9, now)
 
 	items := tc.List()
 
@@ -56,4 +60,18 @@ func TestTrafficCounterNeverDecreasesCounter(t *testing.T) {
 	assert.Equal(t, items[0].Direction, OutgoingConnection)
 	assert.Equal(t, int(items[0].ReplyCounter), 10)
 	assert.Equal(t, int(items[0].OriginCounter), 10)
+}
+
+func TestTrafficCounterClean(t *testing.T) {
+	now := time.Now().UTC().Add(time.Hour * -1)
+
+	tc := newTrafficCounter()
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 10, 10, now)
+	tc.Inc(connTrafficKey{IP: "10.1.1.1", Port: 8000, Direction: OutgoingConnection}, 10, 9, 9, now)
+
+	tc.doClean()
+
+	items := tc.List()
+
+	require.Len(t, items, 0)
 }
