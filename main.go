@@ -72,14 +72,16 @@ func main() {
 	workloadLabels := strings.Split(*workloadLabelsString, ",")
 
 	cidrClasses := map[string]string{}
-	for _, keyPairStr := range strings.Split(*cidrClassesString, ",") {
-		keyPair := strings.SplitN(keyPairStr, "=", 2)
+	if *cidrClassesString != "" {
+		for _, keyPairStr := range strings.Split(*cidrClassesString, ",") {
+			keyPair := strings.SplitN(keyPairStr, "=", 2)
 
-		if len(keyPair) != 2 {
-			log.Fatalf("Invalid cidr key pair: %s", keyPairStr)
+			if len(keyPair) != 2 {
+				log.Fatalf("Invalid cidr key pair: %s", keyPairStr)
+			}
+
+			cidrClasses[keyPair[0]] = keyPair[1]
 		}
-
-		cidrClasses[keyPair[0]] = keyPair[1]
 	}
 
 	classifier, err := collector.NewCIDRClassifier(cidrClasses)
