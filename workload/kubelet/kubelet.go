@@ -140,6 +140,8 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 
+	tlsConfig.BuildNameToCertificate()
+
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	client := &http.Client{Transport: transport}
 
