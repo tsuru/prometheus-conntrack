@@ -349,7 +349,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			continue
 		}
 
-		ch <- prometheus.MustNewConstMetric(nodeOriginBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), trafficBytesItem.DestinationString())
+		ch <- prometheus.MustNewConstMetric(nodeOriginBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), c.destinationLabels(trafficBytesItem.connTrafficKey)...)
 	}
 
 	// workload reply
@@ -371,7 +371,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			continue
 		}
 
-		ch <- prometheus.MustNewConstMetric(nodeReplyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), trafficBytesItem.DestinationString())
+		ch <- prometheus.MustNewConstMetric(nodeReplyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), c.destinationLabels(trafficBytesItem.connTrafficKey)...)
 	}
 }
 
@@ -390,6 +390,21 @@ func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, de
 	} else {
 		values[i+1] = c.dnsCache.ResolveIP(destination.IP)
 		values[i+2] = c.cidrClassifier.Classify(destination.IP)
+	}
+
+	return values
+}
+
+func (c *ConntrackCollector) destinationLabels(destination connTrafficKey) []string {
+	values := []string{
+		destination.DestinationString(),
+		"",
+		"",
+	}
+
+	if destination.IP != "" {
+		values[1] = c.dnsCache.ResolveIP(destination.IP)
+		values[2] = c.cidrClassifier.Classify(destination.IP)
 	}
 
 	return values
