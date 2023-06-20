@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	connectionLabels  = []string{"state", "protocol", "destination", "destination_name", "direction"}
-	originBytesLabels = []string{"destination"}
+	connectionLabels  = []string{"state", "protocol", "destination", "destination_name", "destination_zone", "direction"}
+	originBytesLabels = []string{"destination", "destination_name", "destination_zone"}
 
 	unusedConnectionTTL = 2 * time.Minute
 )
@@ -67,9 +67,10 @@ type ConntrackCollector struct {
 	lastUsedWorkloadTuples sync.Map
 
 	trafficCounter *trafficCounter
+	cidrClassifier *cidrClassifier
 }
 
-func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, dnsCache DNSCache) (*ConntrackCollector, error) {
+func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, dnsCache DNSCache, classifier *cidrClassifier) (*ConntrackCollector, error) {
 	sanitizedWorkloadLabels := []string{engine.Kind()}
 	for _, workloadLabel := range workloadLabels {
 		sanitizedWorkloadLabels = append(sanitizedWorkloadLabels, "label_"+promstrutil.SanitizeLabelName(workloadLabel))
@@ -108,7 +109,7 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 			Name:      "failures_total",
 			Help:      "Number of failures to get workloads",
 		}),
-
+		cidrClassifier: classifier,
 		trafficCounter: newTrafficCounter(),
 	}
 
@@ -292,8 +293,10 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 		values[i+2] = accumulator.destination.String()
 		if accumulator.destination.ip != "" {
 			values[i+3] = c.dnsCache.ResolveIP(accumulator.destination.ip)
+			values[i+4] = c.cidrClassifier.Classify(accumulator.destination.ip)
 		}
-		values[i+4] = string(accumulator.direction)
+
+		values[i+5] = string(accumulator.direction)
 		ch <- prometheus.MustNewConstMetric(workloadConnectionsDesc, prometheus.GaugeValue, float64(count), values...)
 		return true
 	})
@@ -310,11 +313,13 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			accumulator.protocol,
 			accumulator.destination.String(),
 			"",
+			"",
 			string(accumulator.direction),
 		}
 
 		if accumulator.destination.ip != "" {
 			values[3] = c.dnsCache.ResolveIP(accumulator.destination.ip)
+			values[4] = c.cidrClassifier.Classify(accumulator.destination.ip)
 		}
 		ch <- prometheus.MustNewConstMetric(nodeConnectionsDesc, prometheus.GaugeValue, float64(count), values...)
 		return true
@@ -334,7 +339,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			continue
 		}
 
-		ch <- prometheus.MustNewConstMetric(workloadOriginBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), c.workloadBytesLabels(workload, trafficBytesItem.DestinationString())...)
+		ch <- prometheus.MustNewConstMetric(workloadOriginBytesLabelDesc, prometheus.CounterValue, float64(trafficBytesItem.OriginCounter), c.workloadBytesLabels(workload, trafficBytesItem.connTrafficKey)...)
 	}
 
 	// nodes origin
@@ -356,7 +361,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 			continue
 		}
 
-		ch <- prometheus.MustNewConstMetric(replyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), c.workloadBytesLabels(workload, trafficBytesItem.DestinationString())...)
+		ch <- prometheus.MustNewConstMetric(replyBytesTotalDesc, prometheus.CounterValue, float64(trafficBytesItem.ReplyCounter), c.workloadBytesLabels(workload, trafficBytesItem.connTrafficKey)...)
 	}
 
 	// node reply
@@ -370,7 +375,7 @@ func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workload
 	}
 }
 
-func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, destination string) []string {
+func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, destination connTrafficKey) []string {
 	values := make([]string, len(c.workloadLabels)+2)
 	values[0] = workload.Name
 	i := 1
@@ -378,7 +383,12 @@ func (c *ConntrackCollector) workloadBytesLabels(workload *workload.Workload, de
 		values[i] = workload.Labels[k]
 		i++
 	}
-	values[i] = destination
+	values[i] = destination.DestinationString()
+	if destination.IP == "" {
+		values[i+1] = ""
+	} else {
+		values[i+1] = c.cidrClassifier.Classify(destination.IP)
+	}
 
 	return values
 }

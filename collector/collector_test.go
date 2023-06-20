@@ -60,6 +60,9 @@ func TestCollector(t *testing.T) {
 		},
 	}
 
+	classifier, err := NewCIDRClassifier(map[string]string{})
+	require.NoError(t, err)
+
 	collector, _ := New(
 		workloadTesting.New("containerd", "container", []*workload.Workload{
 			{Name: "my-container1", IP: "10.10.1.2", Labels: map[string]string{"label1": "val1", "app": "app1"}},
@@ -67,6 +70,7 @@ func TestCollector(t *testing.T) {
 		conntrack.conntrack,
 		[]string{"app"},
 		&fakeDNSCache{},
+		classifier,
 	)
 	prometheus.MustRegister(collector)
 	rr := httptest.NewRecorder()
@@ -126,6 +130,10 @@ func BenchmarkCollector(b *testing.B) {
 	conntrack := func() ([]*Conn, error) {
 		return conns, nil
 	}
+
+	classifier, err := NewCIDRClassifier(map[string]string{})
+	require.NoError(b, err)
+
 	collector, _ := New(
 		workloadTesting.New("containerd", "container", []*workload.Workload{
 			{Name: "my-container1", IP: "10.10.1.2"},
@@ -134,6 +142,7 @@ func BenchmarkCollector(b *testing.B) {
 		conntrack,
 		[]string{},
 		&fakeDNSCache{},
+		classifier,
 	)
 	ch := make(chan prometheus.Metric)
 	for n := 0; n < b.N; n++ {

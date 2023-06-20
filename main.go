@@ -28,6 +28,8 @@ func main() {
 	protocol := flag.String("protocol", "", "Protocol to track connections. Defaults to all.")
 	engineName := flag.String("engine", "docker", "Engine to track local workload addresses. Defaults to docker.")
 	workloadLabelsString := flag.String("workload-labels", "", "Labels to extract from workload. ie (tsuru.io/app-name,tsuru.io/process-name)")
+	cidrClassesString := flag.String("cidr-classes", "", "CIDRs to extract labels. ie (10.0.0.0/8=internal,0.0.0.0/0=internet)")
+
 	trackSynSent := flag.Bool("track-syn-sent", false, "Turn on track of stuck connections with syn-sent, will enable automatically the net.netfilter.nf_conntrack_timestamp flag on kernel.")
 
 	dockerEndpoint := flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Docker endpoint.")
@@ -68,8 +70,25 @@ func main() {
 	}
 
 	workloadLabels := strings.Split(*workloadLabelsString, ",")
+
+	cidrClasses := map[string]string{}
+	for _, keyPairStr := range strings.Split(*cidrClassesString, ",") {
+		keyPair := strings.SplitN(keyPairStr, "=", 2)
+
+		if len(keyPair) != 2 {
+			log.Fatalf("Invalid cidr key pair: %s", keyPairStr)
+		}
+
+		cidrClasses[keyPair[0]] = keyPair[1]
+	}
+
+	classifier, err := collector.NewCIDRClassifier(cidrClasses)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	conntrack := collector.NewConntrack(*protocol)
-	collector, err := collector.New(engine, conntrack, workloadLabels, nil)
+	collector, err := collector.New(engine, conntrack, workloadLabels, nil, classifier)
 	if err != nil {
 		log.Fatal(err)
 	}
