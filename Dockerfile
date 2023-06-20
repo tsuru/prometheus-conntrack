@@ -1,4 +1,4 @@
-FROM golang:1.14.3-buster as builder
+FROM golang:1.19.10-buster as builder
 
 COPY . /prometheus-conntrack
 WORKDIR /prometheus-conntrack
