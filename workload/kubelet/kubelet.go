@@ -9,8 +9,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/tsuru/prometheus-conntrack/workload"
@@ -114,14 +114,14 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 
 	var tokenContent string
 	if opts.Token != "" {
-		tokenBytes, err := ioutil.ReadFile(opts.Token)
+		tokenBytes, err := os.ReadFile(opts.Token)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not read Token file")
 		}
 		tokenContent = string(tokenBytes)
 	}
 	if opts.CA != "" {
-		caCert, err := ioutil.ReadFile(opts.CA)
+		caCert, err := os.ReadFile(opts.CA)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not read CA file")
 		}
@@ -139,8 +139,6 @@ func NewEngine(opts Opts) (workload.Engine, error) {
 
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-
-	tlsConfig.BuildNameToCertificate()
 
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	client := &http.Client{Transport: transport}
