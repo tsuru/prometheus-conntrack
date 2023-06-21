@@ -7,6 +7,7 @@ import (
 
 type cidrClassifier struct {
 	matchs []cidrMatch
+	cache  map[string]string
 }
 
 type cidrMatch struct {
@@ -15,6 +16,10 @@ type cidrMatch struct {
 }
 
 func (c *cidrClassifier) Classify(IP string) string {
+	if cachedValue, ok := c.cache[IP]; ok {
+		return cachedValue
+	}
+
 	parsedIP := net.ParseIP(IP)
 
 	if parsedIP == nil {
@@ -23,6 +28,7 @@ func (c *cidrClassifier) Classify(IP string) string {
 
 	for _, m := range c.matchs {
 		if m.cidr.Contains(parsedIP) {
+			c.cache[IP] = m.label
 			return m.label
 		}
 	}
@@ -50,5 +56,6 @@ func NewCIDRClassifier(cidrsLabels map[string]string) (*cidrClassifier, error) {
 
 	return &cidrClassifier{
 		matchs: matchs,
+		cache:  map[string]string{},
 	}, nil
 }

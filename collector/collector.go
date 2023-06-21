@@ -66,8 +66,9 @@ type ConntrackCollector struct {
 	// then we will inform metric with 0 value for a while
 	lastUsedWorkloadTuples sync.Map
 
-	trafficCounter *trafficCounter
-	cidrClassifier *cidrClassifier
+	trafficCounter      *trafficCounter
+	cidrClassifier      *cidrClassifier
+	cidrClassifierMutex sync.Mutex
 }
 
 func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, dnsCache DNSCache, classifier *cidrClassifier) (*ConntrackCollector, error) {
@@ -109,8 +110,9 @@ func New(engine workload.Engine, conntrack Conntrack, workloadLabels []string, d
 			Name:      "failures_total",
 			Help:      "Number of failures to get workloads",
 		}),
-		cidrClassifier: classifier,
-		trafficCounter: newTrafficCounter(),
+		cidrClassifier:      classifier,
+		trafficCounter:      newTrafficCounter(),
+		cidrClassifierMutex: sync.Mutex{},
 	}
 
 	go collector.metricCleaner()
@@ -270,6 +272,9 @@ func (c *ConntrackCollector) nodeReplyBytesTotalDesc() *prometheus.Desc {
 }
 
 func (c *ConntrackCollector) sendMetrics(counts map[accumulatorKey]int, workloads map[string]*workload.Workload, ch chan<- prometheus.Metric) {
+	c.cidrClassifierMutex.Lock()
+	defer c.cidrClassifierMutex.Unlock()
+
 	workloadConnectionsDesc := c.workloadConnectionsDesc()
 	nodeConnectionsDesc := c.nodeConnectionsDesc()
 
